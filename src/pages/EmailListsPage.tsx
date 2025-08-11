@@ -1,16 +1,33 @@
 import { Edit, FileText, Mail, RefreshCw, Settings, Trash2, Upload } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { ConfirmModal } from '../components/modals';
 import EmailListModal from '../components/modals/EmailListModal';
 import ImportEmailListModal from '../components/modals/ImportEmailListModal';
-import { useEmailLists, useTxtFileCheck } from '../hooks';
+import { notifyEmailListsUpdate, useEmailLists, useTxtFileCheck } from '../hooks';
 import type { EmailList } from '../types';
 
 const EmailListsPage: React.FC = () => {
-    const { lists, loading, createList, updateList, deleteList } = useEmailLists();
+    const { lists, loading, createList, updateList, deleteList, refetch } = useEmailLists();
     const { txtFileStatus, loading: checkingFiles, checkTxtFiles } = useTxtFileCheck();
     const [showModal, setShowModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
+    const [showClearModal, setShowClearModal] = useState(false);
     const [editingList, setEditingList] = useState<EmailList | null>(null);
+
+    // Teste direto do evento
+    useEffect(() => {
+        const handleListsUpdate = () => {
+            console.log('🔔 EmailListsPage: Evento emailListsUpdated capturado diretamente!');
+            console.log('🔔 EmailListsPage: Chamando refetch manual...');
+            refetch();
+        };
+
+        window.addEventListener('emailListsUpdated', handleListsUpdate);
+
+        return () => {
+            window.removeEventListener('emailListsUpdated', handleListsUpdate);
+        };
+    }, [refetch]);
 
     const handleSaveList = (data: Partial<EmailList>) => {
         if (editingList) {
@@ -21,10 +38,44 @@ const EmailListsPage: React.FC = () => {
         setEditingList(null);
     };
 
-    const handleImportList = (data: { name: string; emails: string[]; chunkSize: number }) => {
-        // Create list with imported emails
-        createList({ name: data.name, emails: data.emails });
-        console.log(`Lista importada com ${data.emails.length} emails, chunking: ${data.chunkSize}`);
+    const handleImportList = async (data: { name: string; emails: string[]; chunkSize: number }) => {
+        try {
+            console.log('handleImportList chamada com:', data);
+
+            // Sempre usar a função chunked, mesmo para listas pequenas
+            const result = await window.electronAPI?.files?.saveEmailListChunked(
+                data.name,
+                data.emails.map(email => ({ email, name: email.split('@')[0] })), // Converter para EmailContact[]
+                data.chunkSize,
+                'txt'
+            );
+
+            if (result && result.length > 0) {
+                console.log(`Lista processada em ${result.length} arquivo(s):`);
+                result.forEach(chunk => {
+                    console.log(`- ${chunk.filename}: ${chunk.count} emails`);
+                });
+
+                // Atualizar a lista de arquivos
+                await checkTxtFiles();
+
+                // Notificar outros componentes sobre a atualização
+                notifyEmailListsUpdate();
+
+                // Mostrar mensagem de sucesso
+                if (result.length === 1) {
+                    alert(`Lista importada com sucesso!\nArquivo: ${result[0].filename} (${result[0].count} emails)`);
+                } else {
+                    alert(`Lista dividida em ${result.length} arquivos:\n${result.map(chunk => `${chunk.filename} (${chunk.count} emails)`).join('\n')}`);
+                }
+            } else {
+                throw new Error('Falha ao salvar arquivos');
+            }
+        } catch (error) {
+            console.error('Erro ao importar lista:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            alert(`Erro ao importar lista: ${errorMessage}`);
+        }
     };
 
     const handleEditList = (list: EmailList) => {
@@ -37,6 +88,30 @@ const EmailListsPage: React.FC = () => {
         setEditingList(null);
     };
 
+    const handleClearAllLists = async () => {
+        try {
+            const success = await window.electronAPI?.files?.clearAllLists();
+
+            if (success) {
+                console.log('Todas as listas foram zeradas com sucesso');
+                setShowClearModal(false);
+                // Recarregar a lista de arquivos
+                await checkTxtFiles();
+                // Notificar outros componentes sobre a atualização
+                notifyEmailListsUpdate();
+                alert('Todas as listas de email foram removidas com sucesso!');
+            } else {
+                throw new Error('Falha ao limpar arquivos de listas');
+            }
+        } catch (error) {
+            console.error('Erro ao zerar listas:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+            alert(`Erro ao zerar listas: ${errorMessage}`);
+        } finally {
+            setShowClearModal(false);
+        }
+    };
+
     return (
         <div className="flex-1 vscode-page">
             <div className="vscode-compact-header">
@@ -47,6 +122,12 @@ const EmailListsPage: React.FC = () => {
                         </h1>
                         <p className="text-[var(--vscode-text-muted)]">
                             Importe e gerencie suas listas de emails
+                            {lists.length > 0 && (
+                                <span className="ml-2">
+                                    • {lists.length} lista{lists.length !== 1 ? 's' : ''}
+                                    • {lists.reduce((total, list) => total + list.emails.length, 0).toLocaleString()} emails total
+                                </span>
+                            )}
                         </p>
                     </div>
                     <div className="flex space-x-2">
@@ -64,6 +145,16 @@ const EmailListsPage: React.FC = () => {
                             <Mail className="h-4 w-4 mr-2" />
                             Nova Lista Manual
                         </button>
+                        {lists.length > 0 && (
+                            <button
+                                onClick={() => setShowClearModal(true)}
+                                className="btn-danger"
+                                title="Zerar todas as listas de email"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Zerar Listas
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -234,6 +325,17 @@ const EmailListsPage: React.FC = () => {
                 isOpen={showImportModal}
                 onClose={() => setShowImportModal(false)}
                 onImport={handleImportList}
+            />
+
+            <ConfirmModal
+                isOpen={showClearModal}
+                onClose={() => setShowClearModal(false)}
+                onConfirm={handleClearAllLists}
+                title="Confirmar Limpeza"
+                message="Tem certeza que deseja zerar todas as listas de emails? Esta ação removerá todos os arquivos de lista e não pode ser desfeita."
+                confirmText="Zerar Listas"
+                cancelText="Cancelar"
+                variant="danger"
             />
         </div>
     );

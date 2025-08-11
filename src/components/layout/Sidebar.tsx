@@ -1,27 +1,25 @@
-import { AlertCircle, CheckCircle, Server } from 'lucide-react';
+import { AlertCircle, CheckCircle, Play, Server } from 'lucide-react';
 import React from 'react';
 import type { EmailList, SmtpConfig } from '../../types';
 
 interface SidebarProps {
     lists: EmailList[];
-    selectedLists: string[];
-    onListToggle: (listId: string) => void;
     smtpConfigs?: SmtpConfig[];
     onSmtpToggle?: (id: string, active: boolean) => void;
+    onTestSmtp?: (config: SmtpConfig) => void;
+    onTestAllSmtps?: () => void;
     loading?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
     lists,
-    selectedLists,
-    onListToggle,
     smtpConfigs = [],
     onSmtpToggle,
+    onTestSmtp,
+    onTestAllSmtps,
     loading = false
 }) => {
-    const totalEmails = lists
-        .filter(list => selectedLists.includes(list.id))
-        .reduce((total, list) => total + list.emails.length, 0);
+    const totalAllEmails = lists.reduce((total, list) => total + list.emails.length, 0);
 
     const activeSmtps = smtpConfigs.filter(smtp => smtp.isActive);
 
@@ -33,9 +31,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <h2 className="text-sm font-semibold" style={{ color: 'var(--vscode-text)' }}>
                         📧 Email Lists
                     </h2>
-                    <span className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
-                        {selectedLists.length} selected • {totalEmails} emails
-                    </span>
+                    <div className="text-xs text-right" style={{ color: 'var(--vscode-text-muted)' }}>
+                        <div>{lists.length} lista{lists.length !== 1 ? 's' : ''}</div>
+                        <div className="font-medium">{totalAllEmails.toLocaleString()} emails</div>
+                    </div>
                 </div>
 
                 {/* Lists */}
@@ -55,41 +54,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                         </div>
                     ) : (
                         <div className="space-y-1">
-                            {lists.map(list => {
-                                const isSelected = selectedLists.includes(list.id);
-
+                                    {lists.map(list => {
                                 return (
                                     <div
                                         key={list.id}
-                                        className={`p-3 rounded border cursor-pointer transition-all duration-200 ${isSelected
-                                            ? 'vscode-item-selected'
-                                            : 'vscode-item-hover'
-                                            }`}
-                                        onClick={() => onListToggle(list.id)}
+                                        className="p-3 rounded border transition-all duration-200 vscode-item-hover"
                                         style={{
-                                            borderColor: isSelected ? 'var(--vscode-accent)' : 'var(--vscode-border)',
-                                            background: isSelected ? 'var(--vscode-accent)15' : 'transparent'
+                                            borderColor: 'var(--vscode-border)',
+                                            background: 'transparent'
                                         }}
                                     >
                                         <div className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => onListToggle(list.id)}
-                                                className="h-3 w-3 rounded border focus:ring-2 mr-3"
-                                                style={{
-                                                    color: 'var(--vscode-accent)',
-                                                    borderColor: 'var(--vscode-border)',
-                                                    background: 'var(--vscode-surface)'
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                            />
                                             <div className="flex-1 min-w-0">
                                                 <h3 className="text-sm font-medium truncate" style={{ color: 'var(--vscode-text)' }}>
                                                     {list.name}
                                                 </h3>
                                                 <div className="flex items-center text-xs mt-1" style={{ color: 'var(--vscode-text-muted)' }}>
-                                                    <span>{list.emails.length} emails</span>
+                                                    <span>{list.emails.length.toLocaleString()} emails</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -110,9 +91,16 @@ const Sidebar: React.FC<SidebarProps> = ({
                             🔧 SMTP Servers
                         </h2>
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
-                        {activeSmtps.length} of {smtpConfigs.length} active
-                    </p>
+                    <div className="flex items-center space-x-2">
+                        <p className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                            {activeSmtps.length} of {smtpConfigs.length} active
+                        </p>
+                        {onTestAllSmtps && (
+                            <button className="text-xs px-2 py-1 rounded border" style={{ borderColor: 'var(--vscode-border)' }} onClick={() => onTestAllSmtps()} title="Testar todos">
+                                <Play className="h-3 w-3 inline mr-1" /> Testar
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="p-2 flex-1 overflow-y-auto vscode-scrollbar">
@@ -149,7 +137,12 @@ const Sidebar: React.FC<SidebarProps> = ({
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="ml-2">
+                                        <div className="ml-2 flex items-center space-x-2">
+                                            {onTestSmtp && (
+                                                <button className="text-xs px-2 py-1 rounded border" style={{ borderColor: 'var(--vscode-border)' }} onClick={(e) => { e.stopPropagation(); onTestSmtp(smtp); }} title="Testar">
+                                                    <Play className="h-3 w-3 inline" />
+                                                </button>
+                                            )}
                                             <input
                                                 type="checkbox"
                                                 checked={smtp.isActive}

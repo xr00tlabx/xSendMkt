@@ -217,8 +217,8 @@ class Database {
     async addSmtp(smtpData) {
         try {
             const result = await this.db.run(
-                `INSERT INTO smtps (name, host, port, secure, username, password, from_email, from_name)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO smtps (name, host, port, secure, username, password, from_email, from_name, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
                 [
                     smtpData.name,
                     smtpData.host,
@@ -227,7 +227,8 @@ class Database {
                     smtpData.username,
                     smtpData.password,
                     smtpData.from_email,
-                    smtpData.from_name
+                    smtpData.from_name,
+                    smtpData.is_active ? 1 : 0
                 ]
             );
             return result.lastID;
@@ -252,21 +253,34 @@ class Database {
 
     async updateSmtp(id, smtpData) {
         try {
+            // Load current row
+            const current = await this.db.get('SELECT * FROM smtps WHERE id = ?', [id]);
+            if (!current) return false;
+
+            // Merge keeping existing values when not provided
+            const merged = {
+                ...current,
+                ...smtpData,
+                secure: smtpData.secure !== undefined ? (smtpData.secure ? 1 : 0) : current.secure,
+                is_active: smtpData.is_active !== undefined ? (smtpData.is_active ? 1 : 0) : current.is_active
+            };
+
             await this.db.run(
                 `UPDATE smtps SET 
                  name = ?, host = ?, port = ?, secure = ?, 
-                 username = ?, password = ?, from_email = ?, from_name = ?,
+                 username = ?, password = ?, from_email = ?, from_name = ?, is_active = ?,
                  updated_at = CURRENT_TIMESTAMP
                  WHERE id = ?`,
                 [
-                    smtpData.name,
-                    smtpData.host,
-                    smtpData.port,
-                    smtpData.secure ? 1 : 0,
-                    smtpData.username,
-                    smtpData.password,
-                    smtpData.from_email,
-                    smtpData.from_name,
+                    merged.name,
+                    merged.host,
+                    merged.port,
+                    merged.secure,
+                    merged.username,
+                    merged.password,
+                    merged.from_email,
+                    merged.from_name,
+                    merged.is_active,
                     id
                 ]
             );

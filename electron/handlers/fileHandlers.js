@@ -107,6 +107,16 @@ export function setupFileHandlers(getMainWindow) {
         }
     });
 
+    // Save email list chunked
+    ipcMain.handle('file:save-email-list-chunked', async (event, basename, emails, chunkSize = 5000, format = 'txt') => {
+        try {
+            return await FileService.saveEmailListChunked(basename, emails, chunkSize, format);
+        } catch (error) {
+            console.error('Error saving chunked email list:', error);
+            throw error;
+        }
+    });
+
     // Delete email list
     ipcMain.handle('file:delete-email-list', async (event, filename) => {
         try {

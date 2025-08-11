@@ -8,6 +8,7 @@ class EmailService {
         this.isProcessing = false;
         this.maxConcurrent = 5;
         this.delayBetweenEmails = 1000;
+        this.smtpTimeoutMs = 10000;
     }
 
     async init() {
@@ -15,14 +16,16 @@ class EmailService {
         const settings = await Database.getAllSettings();
         this.maxConcurrent = settings.max_concurrent_emails || 5;
         this.delayBetweenEmails = settings.delay_between_emails || 1000;
+        this.smtpTimeoutMs = settings.smtp_timeout_ms || 10000;
     }
 
     // Criar transporter para um SMTP específico
     createTransporter(smtpConfig) {
+        const useSecure = smtpConfig.port === 465 ? true : !!smtpConfig.secure;
         const config = {
             host: smtpConfig.host,
             port: smtpConfig.port,
-            secure: smtpConfig.secure, // true para 465, false para outras portas
+            secure: useSecure, // true para 465, false para outras portas
             auth: {
                 user: smtpConfig.username,
                 pass: smtpConfig.password
@@ -31,10 +34,14 @@ class EmailService {
             maxConnections: 5,
             maxMessages: 100,
             rateDelta: 1000, // 1 segundo
-            rateLimit: 5 // 5 emails por segundo
+            rateLimit: 5, // 5 emails por segundo
+            // Timeouts
+            connectionTimeout: this.smtpTimeoutMs,
+            greetingTimeout: this.smtpTimeoutMs,
+            socketTimeout: this.smtpTimeoutMs
         };
 
-        return nodemailer.createTransporter(config);
+        return nodemailer.createTransport(config);
     }
 
     // Obter ou criar transporter para um SMTP
@@ -61,7 +68,11 @@ class EmailService {
     async testSmtp(smtpConfig) {
         try {
             const transporter = this.createTransporter(smtpConfig);
-            await transporter.verify();
+            // Aplica timeout no verify também
+            const result = await Promise.race([
+                transporter.verify(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo limite excedido')), this.smtpTimeoutMs))
+            ]);
             return { success: true, message: 'Conexão SMTP válida' };
         } catch (error) {
             return {

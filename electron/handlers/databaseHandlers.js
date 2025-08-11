@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import Database from '../database/index.js';
 
 export function setupDatabaseHandlers() {
@@ -39,7 +39,12 @@ export function setupDatabaseHandlers() {
     // SMTP handlers
     ipcMain.handle('db:add-smtp', async (event, smtpData) => {
         try {
-            return await Database.addSmtp(smtpData);
+            const id = await Database.addSmtp(smtpData);
+            // Broadcast update to all windows
+            BrowserWindow.getAllWindows().forEach(win => {
+                win.webContents.send('ui:smtp-configs-updated');
+            });
+            return id;
         } catch (error) {
             console.error('Error adding SMTP:', error);
             throw error;
@@ -57,7 +62,13 @@ export function setupDatabaseHandlers() {
 
     ipcMain.handle('db:update-smtp', async (event, id, smtpData) => {
         try {
-            return await Database.updateSmtp(id, smtpData);
+            const ok = await Database.updateSmtp(id, smtpData);
+            if (ok) {
+                BrowserWindow.getAllWindows().forEach(win => {
+                    win.webContents.send('ui:smtp-configs-updated');
+                });
+            }
+            return ok;
         } catch (error) {
             console.error('Error updating SMTP:', error);
             throw error;
@@ -66,7 +77,13 @@ export function setupDatabaseHandlers() {
 
     ipcMain.handle('db:delete-smtp', async (event, id) => {
         try {
-            return await Database.deleteSmtp(id);
+            const ok = await Database.deleteSmtp(id);
+            if (ok) {
+                BrowserWindow.getAllWindows().forEach(win => {
+                    win.webContents.send('ui:smtp-configs-updated');
+                });
+            }
+            return ok;
         } catch (error) {
             console.error('Error deleting SMTP:', error);
             throw error;
@@ -75,7 +92,13 @@ export function setupDatabaseHandlers() {
 
     ipcMain.handle('db:clear-all-smtps', async () => {
         try {
-            return await Database.clearAllSmtps();
+            const ok = await Database.clearAllSmtps();
+            if (ok) {
+                BrowserWindow.getAllWindows().forEach(win => {
+                    win.webContents.send('ui:smtp-configs-updated');
+                });
+            }
+            return ok;
         } catch (error) {
             console.error('Error clearing SMTPs:', error);
             throw error;

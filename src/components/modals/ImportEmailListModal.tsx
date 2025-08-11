@@ -197,7 +197,7 @@ const ImportEmailListModal: React.FC<ImportEmailListModalProps> = ({
                     {/* Quantidade por Linha */}
                     <div>
                         <label className="block text-sm font-medium text-[var(--vscode-text)] mb-1">
-                            Emails por Arquivo (Chunking)
+                            Emails por Arquivo (Divisão automática)
                         </label>
                         <input
                             type="number"
@@ -209,7 +209,7 @@ const ImportEmailListModal: React.FC<ImportEmailListModalProps> = ({
                             disabled={isProcessing}
                         />
                         <p className="text-xs text-[var(--vscode-text-muted)] mt-1">
-                            Divide a lista em arquivos menores (padrão: 5.000 emails por arquivo)
+                            Se a lista tiver mais emails que este limite, será dividida automaticamente em múltiplos arquivos numerados (ex: lista1.txt, lista2.txt, lista3.txt...)
                         </p>
                     </div>
 
@@ -309,6 +309,29 @@ const ImportEmailListModal: React.FC<ImportEmailListModalProps> = ({
                                     <span className="text-[var(--vscode-accent)] font-medium">{stats.finalCount.toLocaleString()}</span>
                                 </div>
                             </div>
+
+                            {/* Prévia da divisão */}
+                            {stats.finalCount > formData.chunkSize && (
+                                <div className="mt-3 pt-2 border-t border-[var(--vscode-border)]">
+                                    <h5 className="text-xs font-medium text-[var(--vscode-text)] mb-2">Divisão dos Arquivos:</h5>
+                                    <div className="text-xs text-[var(--vscode-text-muted)]">
+                                        {Math.ceil(stats.finalCount / formData.chunkSize)} arquivos serão criados:
+                                        <div className="mt-1 space-y-1">
+                                            {Array.from({ length: Math.ceil(stats.finalCount / formData.chunkSize) }, (_, i) => {
+                                                const start = i * formData.chunkSize;
+                                                const end = Math.min(start + formData.chunkSize, stats.finalCount);
+                                                const count = end - start;
+                                                return (
+                                                    <div key={i} className="flex justify-between">
+                                                        <span className="text-[var(--vscode-accent)]">{formData.name}{i + 1}.txt</span>
+                                                        <span>{count.toLocaleString()} emails</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 

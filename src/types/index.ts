@@ -14,6 +14,8 @@ export interface SmtpConfig {
     secure: boolean;
     username: string;
     password: string;
+    fromEmail: string; // New field to define the default sender email
+    fromName: string;  // New field to define the default sender name
     isActive: boolean;
 }
 
@@ -73,3 +75,4 @@ export interface TxtFileCheck {
 }
 
 export * from './electron';
+

@@ -6,6 +6,7 @@ interface AppSettings {
     simultaneousEmails: number;
     emailDelay: number;
     autoSave: boolean;
+    smtpTimeoutMs: number;
 }
 
 const SettingsPage: React.FC = () => {
@@ -13,7 +14,8 @@ const SettingsPage: React.FC = () => {
         listsDirectory: '',
         simultaneousEmails: 5,
         emailDelay: 1000,
-        autoSave: true
+        autoSave: true,
+        smtpTimeoutMs: 10000
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -21,7 +23,9 @@ const SettingsPage: React.FC = () => {
     // Carregar configurações ao montar o componente
     useEffect(() => {
         loadSettings();
-    }, []);    const loadSettings = async () => {
+    }, []);
+
+    const loadSettings = async () => {
         try {
             setLoading(true);
 
@@ -30,12 +34,14 @@ const SettingsPage: React.FC = () => {
             const simultaneousEmails = await window.electronAPI?.database?.getSetting('max_concurrent_emails');
             const emailDelay = await window.electronAPI?.database?.getSetting('delay_between_emails');
             const autoSave = await window.electronAPI?.database?.getSetting('auto_save_campaigns');
+            const smtpTimeoutMs = await window.electronAPI?.database?.getSetting('smtp_timeout_ms');
 
             setSettings({
                 listsDirectory: listsDir || '',
                 simultaneousEmails: parseInt(simultaneousEmails || '5', 10),
                 emailDelay: parseInt(emailDelay || '1000', 10),
-                autoSave: (autoSave === 'true' || autoSave === true)
+                autoSave: (autoSave === 'true' || autoSave === true),
+                smtpTimeoutMs: parseInt(smtpTimeoutMs || '10000', 10)
             });
         } catch (error) {
             // console.error('Erro ao carregar configurações:', error);
@@ -81,6 +87,7 @@ const SettingsPage: React.FC = () => {
             await window.electronAPI?.database?.setSetting('max_concurrent_emails', settings.simultaneousEmails.toString(), 'number');
             await window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number');
             await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
+            await window.electronAPI?.database?.setSetting('smtp_timeout_ms', settings.smtpTimeoutMs.toString(), 'number');
 
             alert('Configurações salvas com sucesso!');
         } catch (error) {
@@ -177,6 +184,20 @@ const SettingsPage: React.FC = () => {
                                         min="0"
                                         value={settings.emailDelay}
                                         onChange={(e) => handleInputChange('emailDelay', parseInt(e.target.value, 10))}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Timeout SMTP (ms)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        min="1000"
+                                        step="500"
+                                        value={settings.smtpTimeoutMs}
+                                        onChange={(e) => handleInputChange('smtpTimeoutMs', parseInt(e.target.value, 10))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
                                 </div>

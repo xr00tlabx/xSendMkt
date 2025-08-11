@@ -112,6 +112,13 @@ export interface TxtFileCheck {
     message: string;
 }
 
+export interface ChunkedFileResult {
+    filename: string;
+    path: string;
+    count: number;
+    chunkNumber: number;
+}
+
 // API do Electron exposta via contextBridge
 export interface ElectronAPI {
 // App methods
@@ -169,6 +176,7 @@ export interface ElectronAPI {
         getEmailLists: () => Promise<EmailList[]>;
         readEmails: (filename: string) => Promise<EmailContact[]>;
         saveEmailList: (filename: string, emails: EmailContact[], format?: string) => Promise<string>;
+        saveEmailListChunked: (basename: string, emails: EmailContact[], chunkSize: number, format?: string) => Promise<ChunkedFileResult[]>;
         deleteEmailList: (filename: string) => Promise<boolean>;
         clearAllLists: () => Promise<boolean>;
         mergeLists: (filenames: string[], outputFilename: string, format?: string) => Promise<string>;
@@ -201,6 +209,10 @@ export interface ElectronAPI {
     // Window event listeners
     onWindowMaximized: (callback: () => void) => void;
     onWindowUnmaximized: (callback: () => void) => void;
+
+    // UI broadcast helpers
+    notifyEmailListsUpdated: () => void;
+    onEmailListsUpdated: (callback: () => void) => void;
 
     // Generic event listener
     on: (channel: string, callback: () => void) => void;

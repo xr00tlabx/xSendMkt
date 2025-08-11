@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { notifyEmailListsUpdate } from '../../hooks';
 import type { AppSettings, SmtpConfig } from '../../types';
 import { ConfirmModal, LoadSmtpsModal, SettingsModal, TestSmtpsModal } from '../modals';
 
@@ -71,10 +72,28 @@ const Header: React.FC = () => {
         };
     }, []);
 
-    const handleClearLists = () => {
-        localStorage.removeItem('emailLists');
-        setShowClearListsModal(false);
-        window.location.reload();
+    const handleClearLists = async () => {
+        try {
+            // Limpar listas do localStorage
+            localStorage.removeItem('emailLists');
+
+            // Limpar arquivos físicos via Electron
+            const success = await window.electronAPI?.files?.clearAllLists();
+
+            if (success) {
+                console.log('Todas as listas foram zeradas com sucesso');
+                setShowClearListsModal(false);
+                // Notificar outros componentes sobre a atualização
+                notifyEmailListsUpdate();
+                window.location.reload();
+            } else {
+                throw new Error('Falha ao limpar arquivos de listas');
+            }
+        } catch (error) {
+            console.error('Erro ao zerar listas:', error);
+            alert(`Erro ao zerar listas: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+            setShowClearListsModal(false);
+        }
     };
 
     const handleClearSmtps = () => {

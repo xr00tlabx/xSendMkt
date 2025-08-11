@@ -7,13 +7,17 @@ interface SmtpListProps {
     loading?: boolean;
     onEdit?: (config: SmtpConfig) => void;
     onToggleActive?: (id: string, active: boolean) => void;
+    onTestOne?: (config: SmtpConfig) => void;
+    onTestAll?: () => void;
 }
 
 const SmtpList: React.FC<SmtpListProps> = ({
     configs,
     loading = false,
     onEdit,
-    onToggleActive
+    onToggleActive,
+    onTestOne,
+    onTestAll
 }) => {
     const activeConfigs = configs.filter(config => config.isActive);
 
@@ -25,8 +29,19 @@ const SmtpList: React.FC<SmtpListProps> = ({
                         <Server className="h-5 w-5 text-gray-600 mr-2" />
                         <h2 className="text-lg font-semibold text-gray-900">SMTP Servers</h2>
                     </div>
-                    <div className="text-sm text-gray-600">
-                        {activeConfigs.length} of {configs.length} active
+                    <div className="flex items-center space-x-3">
+                        <div className="text-sm text-gray-600">
+                            {activeConfigs.length} of {configs.length} active
+                        </div>
+                        {onTestAll && (
+                            <button
+                                className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+                                onClick={(e) => { e.stopPropagation(); onTestAll(); }}
+                                title="Testar todos os SMTPs"
+                            >
+                                Testar todos
+                            </button>
+                        )}
                     </div>
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
@@ -91,7 +106,7 @@ const SmtpList: React.FC<SmtpListProps> = ({
                                     </div>
 
                                     {/* Status */}
-                                    <div className="mt-3">
+                                    <div className="mt-3 flex items-center justify-between">
                                         <span
                                             className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${config.isActive
                                                     ? 'bg-green-100 text-green-800'
@@ -100,6 +115,16 @@ const SmtpList: React.FC<SmtpListProps> = ({
                                         >
                                             {config.isActive ? 'Active' : 'Inactive'}
                                         </span>
+
+                                        {onTestOne && (
+                                            <button
+                                                className="text-xs px-2 py-1 rounded bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+                                                onClick={(e) => { e.stopPropagation(); onTestOne(config); }}
+                                                title="Testar conexão"
+                                            >
+                                                Testar
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
 

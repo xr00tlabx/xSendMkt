@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
         getEmailLists: () => ipcRenderer.invoke('file:get-email-lists'),
         readEmails: (filename) => ipcRenderer.invoke('file:read-emails', filename),
         saveEmailList: (filename, emails, format) => ipcRenderer.invoke('file:save-email-list', filename, emails, format),
+        saveEmailListChunked: (basename, emails, chunkSize, format) => ipcRenderer.invoke('file:save-email-list-chunked', basename, emails, chunkSize, format),
         deleteEmailList: (filename) => ipcRenderer.invoke('file:delete-email-list', filename),
         clearAllLists: () => ipcRenderer.invoke('file:clear-all-lists'),
         mergeLists: (filenames, outputFilename, format) => ipcRenderer.invoke('file:merge-lists', filenames, outputFilename, format),
@@ -93,6 +94,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onWindowMaximized: (callback) => ipcRenderer.on('window-maximized', callback),
     onWindowUnmaximized: (callback) => ipcRenderer.on('window-unmaximized', callback),
 
+    // UI broadcast helpers (cross-window)
+    notifyEmailListsUpdated: () => ipcRenderer.send('ui:email-lists-updated'),
+    onEmailListsUpdated: (callback) => ipcRenderer.on('ui:email-lists-updated', callback),
+    notifySmtpConfigsUpdated: () => ipcRenderer.send('ui:smtp-configs-updated'),
+    onSmtpConfigsUpdated: (callback) => ipcRenderer.on('ui:smtp-configs-updated', callback),
+
     // Generic event listener
     on: (channel, callback) => {
         const validChannels = [
@@ -104,7 +111,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
             'menu-test-smtps',
             'menu-open-settings',
             'window-maximized',
-            'window-unmaximized'
+            'window-unmaximized',
+            'ui:email-lists-updated',
+            'ui:smtp-configs-updated'
         ];
         if (validChannels.includes(channel)) {
             ipcRenderer.on(channel, callback);

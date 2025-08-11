@@ -1,6 +1,7 @@
 import { AlertCircle, FileText, Upload, X } from 'lucide-react';
 import React, { useState } from 'react';
 import type { SmtpConfig } from '../../types';
+import { detectSmtpFromEmail, validateEmail } from '../../utils/smtpDetector';
 
 interface LoadSmtpsModalProps {
     isOpen: boolean;
@@ -20,34 +21,78 @@ const LoadSmtpsModal: React.FC<LoadSmtpsModalProps> = ({ isOpen, onClose, onLoad
 
         lines.forEach((line, index) => {
             try {
-                // Format: host:port:username:password or host:port:username:password:secure
-                const parts = line.split(':');
-                if (parts.length < 4) {
-                    errors.push(`Linha ${index + 1}: Formato inválido. Use: host:port:username:password`);
-                    return;
+                // Detecta se é formato antigo (host:port:username:password) ou novo (email|password)
+                if (line.includes('|')) {
+                    // Novo formato: email|password
+                    const parts = line.split('|');
+                    if (parts.length !== 2) {
+                        errors.push(`Linha ${index + 1}: Formato inválido. Use: email|password`);
+                        return;
+                    }
+
+                    const [email, password] = parts.map(p => p.trim());
+
+                    if (!validateEmail(email)) {
+                        errors.push(`Linha ${index + 1}: Email inválido: ${email}`);
+                        return;
+                    }
+
+                    if (!password) {
+                        errors.push(`Linha ${index + 1}: Senha não pode estar vazia`);
+                        return;
+                    }
+
+                    // Detecta automaticamente as configurações SMTP
+                    const smtpDetection = detectSmtpFromEmail(email);
+
+                    const smtp: SmtpConfig = {
+                        id: `smtp_${Date.now()}_${index}`,
+                        name: smtpDetection.detected
+                            ? `${smtpDetection.provider?.toUpperCase()} - ${email}`
+                            : `Auto-detectado - ${email}`,
+                        host: smtpDetection.host,
+                        port: smtpDetection.port,
+                        secure: smtpDetection.secure,
+                        username: email,
+                        password: password,
+                        fromEmail: email,
+                        fromName: email.split('@')[0],
+                        isActive: true
+                    };
+
+                    smtps.push(smtp);
+                } else {
+                    // Formato antigo: host:port:username:password ou host:port:username:password:secure
+                    const parts = line.split(':');
+                    if (parts.length < 4) {
+                        errors.push(`Linha ${index + 1}: Formato inválido. Use: host:port:username:password ou email|password`);
+                        return;
+                    }
+
+                    const [host, portStr, username, password, secureStr] = parts;
+                    const port = parseInt(portStr);
+                    const secure = secureStr === 'true' || secureStr === '1' || port === 465;
+
+                    if (isNaN(port) || port < 1 || port > 65535) {
+                        errors.push(`Linha ${index + 1}: Porta inválida: ${portStr}`);
+                        return;
+                    }
+
+                    const smtp: SmtpConfig = {
+                        id: `smtp_${Date.now()}_${index}`,
+                        name: `SMTP ${host}:${port}`,
+                        host: host.trim(),
+                        port,
+                        secure,
+                        username: username.trim(),
+                        password: password.trim(),
+                        fromEmail: validateEmail(username.trim()) ? username.trim() : '',
+                        fromName: validateEmail(username.trim()) ? username.trim().split('@')[0] : '',
+                        isActive: true
+                    };
+
+                    smtps.push(smtp);
                 }
-
-                const [host, portStr, username, password, secureStr] = parts;
-                const port = parseInt(portStr);
-                const secure = secureStr === 'true' || secureStr === '1' || port === 465;
-
-                if (isNaN(port) || port < 1 || port > 65535) {
-                    errors.push(`Linha ${index + 1}: Porta inválida: ${portStr}`);
-                    return;
-                }
-
-                const smtp: SmtpConfig = {
-                    id: `smtp_${Date.now()}_${index}`,
-                    name: `SMTP ${host}:${port}`,
-                    host: host.trim(),
-                    port,
-                    secure,
-                    username: username.trim(),
-                    password: password.trim(),
-                    isActive: true
-                };
-
-                smtps.push(smtp);
             } catch (error) {
                 errors.push(`Linha ${index + 1}: Erro ao processar linha: ${error}`);
             }
@@ -145,7 +190,7 @@ const LoadSmtpsModal: React.FC<LoadSmtpsModalProps> = ({ isOpen, onClose, onLoad
                                         <textarea
                                             value={smtpsText}
                                             onChange={(e) => handleTextChange(e.target.value)}
-                                            placeholder="Cole ou digite os dados dos SMTPs aqui...&#10;&#10;Formato: host:port:username:password&#10;Exemplo:&#10;smtp.gmail.com:587:user@gmail.com:password&#10;mail.exemplo.com:465:admin:senha123"
+                                            placeholder="Cole ou digite os dados dos SMTPs aqui...&#10;&#10;Formato 1 (Auto-detecção): email|password&#10;Exemplo: user@gmail.com|minhasenha&#10;&#10;Formato 2 (Manual): host:port:username:password&#10;Exemplo: smtp.gmail.com:587:user@gmail.com:password"
                                             rows={12}
                                             className="w-full px-4 py-3 bg-[var(--vscode-input-background)]/80 border border-[var(--vscode-input-border)]/50 rounded-xl text-[var(--vscode-input-foreground)] focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:border-green-500/50 transition-all duration-200 backdrop-blur-sm font-mono text-sm"
                                         />
@@ -172,16 +217,33 @@ const LoadSmtpsModal: React.FC<LoadSmtpsModalProps> = ({ isOpen, onClose, onLoad
                                             <div className="p-2 bg-blue-500/20 rounded-lg">
                                                 <FileText className="h-5 w-5 text-blue-400" />
                                             </div>
-                                            <div>
-                                                <h4 className="text-sm font-medium text-[var(--vscode-foreground)] mb-2">
-                                                    Formato esperado:
+                                            <div className="flex-1">
+                                                <h4 className="text-sm font-medium text-[var(--vscode-foreground)] mb-3">
+                                                    Formatos aceitos:
                                                 </h4>
-                                                <div className="space-y-2">
-                                                    <code className="text-sm bg-[var(--vscode-textPreformat-background)]/80 px-3 py-1 rounded border border-[var(--vscode-border)]/30 text-[var(--vscode-textPreformat-foreground)]">
-                                                        host:port:username:password
-                                                    </code>
-                                                    <div className="text-xs text-[var(--vscode-descriptionForeground)] space-y-1 mt-2">
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <div className="text-xs text-green-400 font-medium mb-2">✨ Formato Simples (Auto-detecção):</div>
+                                                        <code className="text-sm bg-[var(--vscode-textPreformat-background)]/80 px-3 py-1 rounded border border-green-500/30 text-green-400">
+                                                            email|password
+                                                        </code>
+                                                        <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                                                            • Detecta automaticamente o servidor SMTP
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs text-blue-400 font-medium mb-2">🔧 Formato Manual:</div>
+                                                        <code className="text-sm bg-[var(--vscode-textPreformat-background)]/80 px-3 py-1 rounded border border-[var(--vscode-border)]/30 text-[var(--vscode-textPreformat-foreground)]">
+                                                            host:port:username:password
+                                                        </code>
+                                                        <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
+                                                            • Configuração manual completa
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-xs text-[var(--vscode-descriptionForeground)] space-y-1 mt-3 bg-[var(--vscode-textBlockQuote-background)]/30 p-3 rounded-lg">
+                                                        <div>📝 <strong>Dicas:</strong></div>
                                                         <div>• Um SMTP por linha</div>
+                                                        <div>• Formato simples suporta Gmail, Outlook, Yahoo e muitos outros</div>
                                                         <div>• Porta 465 = SSL automático</div>
                                                         <div>• Outras portas = TLS/STARTTLS</div>
                                                     </div>
@@ -238,12 +300,37 @@ const LoadSmtpsModal: React.FC<LoadSmtpsModalProps> = ({ isOpen, onClose, onLoad
                                                     className="px-4 py-3 border-b border-[var(--vscode-border)]/20 last:border-b-0 hover:bg-green-500/5 transition-all duration-200"
                                                 >
                                                     <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <div className="text-sm font-medium text-[var(--vscode-foreground)]">
-                                                                {smtp.host}:{smtp.port}
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center space-x-2">
+                                                                <div className="text-sm font-medium text-[var(--vscode-foreground)]">
+                                                                    {smtp.host}:{smtp.port}
+                                                                </div>
+                                                                {smtp.name.includes('Auto-detectado') && (
+                                                                    <div className="text-xs px-2 py-1 bg-green-500/20 border border-green-500/30 text-green-400 rounded-full font-medium">
+                                                                        Auto
+                                                                    </div>
+                                                                )}
+                                                                {smtp.name.includes('GMAIL') && (
+                                                                    <div className="text-xs px-2 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-400 rounded-full font-medium">
+                                                                        Gmail
+                                                                    </div>
+                                                                )}
+                                                                {smtp.name.includes('OUTLOOK') && (
+                                                                    <div className="text-xs px-2 py-1 bg-purple-500/20 border border-purple-500/30 text-purple-400 rounded-full font-medium">
+                                                                        Outlook
+                                                                    </div>
+                                                                )}
+                                                                {smtp.name.includes('YAHOO') && (
+                                                                    <div className="text-xs px-2 py-1 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 rounded-full font-medium">
+                                                                        Yahoo
+                                                                    </div>
+                                                                )}
                                                             </div>
-                                                            <div className="text-xs text-[var(--vscode-descriptionForeground)]">
+                                                            <div className="text-xs text-[var(--vscode-descriptionForeground)] mt-1">
                                                                 {smtp.username} • {smtp.secure ? 'SSL' : 'TLS/STARTTLS'}
+                                                                {smtp.fromEmail && (
+                                                                    <span className="ml-2 text-green-400">• From: {smtp.fromEmail}</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className={`text-xs px-2 py-1 rounded-full font-medium border ${smtp.secure

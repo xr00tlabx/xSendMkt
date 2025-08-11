@@ -1,7 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../services';
 import type { EmailCampaign, EmailList, SmtpConfig, TxtFileCheck } from '../types';
 import type { Campaign } from '../types/electron';
+
+// Função utilitária para notificar atualizações de listas
+export const notifyEmailListsUpdate = () => {
+    console.log('📢 Disparando evento emailListsUpdated...');
+    const event = new CustomEvent('emailListsUpdated');
+    window.dispatchEvent(event);
+    // Also notify Electron main to broadcast to all windows (e.g., main + modals)
+    try {
+        window.electronAPI?.notifyEmailListsUpdated?.();
+    } catch { }
+    console.log('✅ Evento emailListsUpdated disparado');
+};
+
+// Função utilitária para notificar atualizações de SMTPs
+export const notifySmtpConfigsUpdate = () => {
+    console.log('📢 Disparando evento smtpConfigsUpdated...');
+    const event = new CustomEvent('smtpConfigsUpdated');
+    window.dispatchEvent(event);
+    // Também notifica o processo principal para broadcast entre janelas
+    try {
+        // Preload pode não ter esses métodos em versões antigas
+        // então protegemos com try/catch
+        // @ts-ignore
+        window.electronAPI?.notifySmtpConfigsUpdated?.();
+    } catch { }
+    console.log('✅ Evento smtpConfigsUpdated disparado');
+};
 
 export const useTxtFileCheck = () => {
     const [txtFileStatus, setTxtFileStatus] = useState<TxtFileCheck>({
@@ -39,26 +66,29 @@ export const useEmailLists = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const fetchLists = async () => {
+    const fetchLists = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const data = await apiService.getEmailLists();
+            console.log('Carregando listas do backend:', data);
             // Convert from electron EmailList[] to app EmailList[]
             const convertedLists = data.map(list => ({
                 id: list.name, // Use name as ID
                 name: list.name,
-                emails: [], // Will need to load separately if needed
+                emails: Array(list.emailCount).fill(''), // Create array with correct length for count
                 createdAt: list.modified,
                 updatedAt: list.modified
             }));
+            console.log('Listas convertidas:', convertedLists);
             setLists(convertedLists);
         } catch (err) {
+            console.error('Erro ao buscar listas:', err);
             setError(err instanceof Error ? err.message : 'Failed to fetch email lists');
         } finally {
             setLoading(false);
         }
-    };
+    }, []); // Array vazio para que a função não mude entre renders
 
     const createList = async (data: Omit<EmailList, 'id' | 'createdAt' | 'updatedAt'>) => {
         setLoading(true);
@@ -73,6 +103,8 @@ export const useEmailLists = () => {
                 updatedAt: new Date()
             };
             setLists(prev => [...prev, newList]);
+            // Notificar outros componentes
+            notifyEmailListsUpdate();
             return newList;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to create email list');
@@ -90,6 +122,8 @@ export const useEmailLists = () => {
             setLists(prev => prev.map(list => 
                 list.id === id ? { ...list, ...data, updatedAt: new Date() } : list
             ));
+            // Notificar outros componentes
+            notifyEmailListsUpdate();
             return { ...data, id, updatedAt: new Date() } as EmailList;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update email list');
@@ -105,6 +139,8 @@ export const useEmailLists = () => {
         try {
             await apiService.deleteEmailList(id);
             setLists(prev => prev.filter(list => list.id !== id));
+            // Notificar outros componentes
+            notifyEmailListsUpdate();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete email list');
             throw err;
@@ -115,7 +151,27 @@ export const useEmailLists = () => {
 
     useEffect(() => {
         fetchLists();
-    }, []);
+
+        // Escutar eventos de atualização de listas (intra-window)
+        const handleListsUpdate = () => {
+            console.log('🔄 Evento emailListsUpdated recebido, recarregando listas...');
+            fetchLists();
+        };
+        window.addEventListener('emailListsUpdated', handleListsUpdate);
+
+        // Escutar broadcast do processo principal (cross-window)
+        const handleIpcListsUpdate = () => {
+            console.log('🛰️ IPC ui:email-lists-updated recebido, recarregando listas...');
+            fetchLists();
+        };
+        window.electronAPI?.onEmailListsUpdated?.(handleIpcListsUpdate);
+
+        return () => {
+            window.removeEventListener('emailListsUpdated', handleListsUpdate);
+            // removeAllListeners only if available; otherwise ignore
+            try { window.electronAPI?.removeAllListeners?.('ui:email-lists-updated'); } catch { }
+        };
+    }, [fetchLists]); // fetchLists agora é uma dependência estável
 
     return {
         lists,
@@ -139,14 +195,16 @@ export const useSmtpConfigs = () => {
         try {
             const data = await apiService.getSmtpConfigs();
             // Convert from electron SmtpConfig[] to app SmtpConfig[]
-            const convertedConfigs = data.map(config => ({
+            const convertedConfigs: SmtpConfig[] = data.map((config: any) => ({
                 id: config.id?.toString() || '',
                 name: config.name,
                 host: config.host,
                 port: config.port,
-                secure: config.secure,
+                secure: !!config.secure,
                 username: config.username,
                 password: config.password,
+                fromEmail: config.from_email || '',
+                fromName: config.from_name || '',
                 isActive: config.is_active || false
             }));
             setConfigs(convertedConfigs);
@@ -161,9 +219,23 @@ export const useSmtpConfigs = () => {
         setLoading(true);
         setError(null);
         try {
-            const newId = await apiService.createSmtpConfig(data);
-            const newConfig = { ...data, id: newId.toString() };
+            // Map to electron schema
+            const payload = {
+                name: data.name,
+                host: data.host,
+                port: data.port,
+                secure: data.secure,
+                username: data.username,
+                password: data.password,
+                from_email: data.fromEmail,
+                from_name: data.fromName,
+                is_active: data.isActive
+            };
+            const newId = await apiService.createSmtpConfig(payload);
+            const newConfig: SmtpConfig = { ...data, id: newId.toString() };
             setConfigs(prev => [...prev, newConfig]);
+            // Notificar Sidebar e outras telas
+            notifySmtpConfigsUpdate();
             return newConfig;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to create SMTP config');
@@ -177,11 +249,25 @@ export const useSmtpConfigs = () => {
         setLoading(true);
         setError(null);
         try {
-            const success = await apiService.updateSmtpConfig(parseInt(id), data);
+            // Map partial to electron schema
+            const payload: any = {};
+            if (data.name !== undefined) payload.name = data.name;
+            if (data.host !== undefined) payload.host = data.host;
+            if (data.port !== undefined) payload.port = data.port;
+            if (data.secure !== undefined) payload.secure = data.secure;
+            if (data.username !== undefined) payload.username = data.username;
+            if (data.password !== undefined) payload.password = data.password;
+            if (data.fromEmail !== undefined) payload.from_email = data.fromEmail;
+            if (data.fromName !== undefined) payload.from_name = data.fromName;
+            if (data.isActive !== undefined) payload.is_active = data.isActive;
+
+            const success = await apiService.updateSmtpConfig(parseInt(id), payload);
             if (success) {
-                setConfigs(prev => prev.map(config => 
-                    config.id === id ? { ...config, ...data } : config
+                setConfigs(prev => prev.map(config =>
+                    config.id === id ? { ...config, ...data } as SmtpConfig : config
                 ));
+                // Notificar Sidebar e outras telas
+                notifySmtpConfigsUpdate();
                 return { ...data, id } as SmtpConfig;
             }
             throw new Error('Update failed');
@@ -199,6 +285,8 @@ export const useSmtpConfigs = () => {
         try {
             await apiService.deleteSmtpConfig(parseInt(id));
             setConfigs(prev => prev.filter(config => config.id !== id));
+            // Notificar Sidebar e outras telas
+            notifySmtpConfigsUpdate();
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete SMTP config');
             throw err;
@@ -207,8 +295,65 @@ export const useSmtpConfigs = () => {
         }
     };
 
+    const testConfig = async (config: SmtpConfig) => {
+        try {
+            const payload = {
+                name: config.name,
+                host: config.host,
+                port: config.port,
+                secure: config.secure,
+                username: config.username,
+                password: config.password,
+                from_email: config.fromEmail,
+                from_name: config.fromName,
+                is_active: config.isActive
+            };
+            // Get timeout setting and apply client-side safety net as well
+            const timeoutSetting = await apiService.getSetting('smtp_timeout_ms');
+            const timeoutMs = parseInt((timeoutSetting as any) || '10000', 10);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const result = await apiService.testSmtp(payload);
+                clearTimeout(timeout);
+                return result;
+            } catch (err) {
+                clearTimeout(timeout);
+                throw err;
+            }
+        } catch (err) {
+            throw err;
+        }
+    };
+
     useEffect(() => {
         fetchConfigs();
+
+        // Escutar eventos de atualização de SMTPs (intra-window)
+        const handleSmtpsUpdate = () => {
+            console.log('🔄 Evento smtpConfigsUpdated recebido, recarregando SMTPs...');
+            fetchConfigs();
+        };
+        window.addEventListener('smtpConfigsUpdated', handleSmtpsUpdate);
+
+        // Escutar broadcast do processo principal (cross-window)
+        const handleIpcSmtpsUpdate = () => {
+            console.log('🛰️ IPC ui:smtp-configs-updated recebido, recarregando SMTPs...');
+            // @ts-ignore
+            fetchConfigs();
+        };
+        try {
+            // @ts-ignore
+            window.electronAPI?.onSmtpConfigsUpdated?.(handleIpcSmtpsUpdate);
+        } catch { }
+
+        return () => {
+            window.removeEventListener('smtpConfigsUpdated', handleSmtpsUpdate);
+            try {
+                // @ts-ignore
+                window.electronAPI?.removeAllListeners?.('ui:smtp-configs-updated');
+            } catch { }
+        };
     }, []);
 
     return {
@@ -218,6 +363,7 @@ export const useSmtpConfigs = () => {
         createConfig,
         updateConfig,
         deleteConfig,
+        testConfig,
         refetch: fetchConfigs
     };
 };

@@ -31,6 +31,9 @@ export const apiService = {
     saveEmailList: (filename: string, emails: any[], format?: string) =>
         window.electronAPI?.files?.saveEmailList(filename, emails, format) || Promise.resolve(''),
 
+    saveEmailListChunked: (basename: string, emails: any[], chunkSize: number, format?: string) =>
+        window.electronAPI?.files?.saveEmailListChunked(basename, emails, chunkSize, format) || Promise.resolve([]),
+
     deleteEmailList: (filename: string) =>
         window.electronAPI?.files?.deleteEmailList(filename) || Promise.resolve(false),
 

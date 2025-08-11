@@ -82,6 +82,20 @@ function setupIpcHandlers() {
             autoUpdaterService.quitAndInstall();
         });
     }
+
+    // UI broadcast: email lists updated
+    ipcMain.on('ui:email-lists-updated', () => {
+        BrowserWindow.getAllWindows().forEach(win => {
+            win.webContents.send('ui:email-lists-updated');
+        });
+    });
+
+    // UI broadcast: SMTP configs updated
+    ipcMain.on('ui:smtp-configs-updated', () => {
+        BrowserWindow.getAllWindows().forEach(win => {
+            win.webContents.send('ui:smtp-configs-updated');
+        });
+    });
 }
 
 function createWindow() {
@@ -222,6 +236,10 @@ function createMenu() {
                         if (result.response === 1) {
                             try {
                                 await FileService.clearAllLists();
+                                // Broadcast update to all windows so Sidebar refreshes
+                                BrowserWindow.getAllWindows().forEach(win => {
+                                    win.webContents.send('ui:email-lists-updated');
+                                });
                                 new Notification({
                                     title: 'xSendMkt',
                                     body: 'Todas as listas foram zeradas com sucesso!'
@@ -273,6 +291,10 @@ function createMenu() {
                         if (result.response === 1) {
                             try {
                                 await Database.clearAllSmtps();
+                                // Broadcast update so all Sidebars refresh
+                                BrowserWindow.getAllWindows().forEach(win => {
+                                    win.webContents.send('ui:smtp-configs-updated');
+                                });
                                 new Notification({
                                     title: 'xSendMkt',
                                     body: 'Todos os SMTPs foram zerados com sucesso!'
@@ -372,14 +394,6 @@ app.whenReady().then(async () => {
 
     // Create menu
     createMenu();
-
-    // Em desenvolvimento, abrir configurações automaticamente para teste
-    if (isDev) {
-        setTimeout(() => {
-            // console.log('Abrindo configurações automaticamente para desenvolvimento...');
-            createSettingsWindow(mainWindow);
-        }, 2000);
-    }
 
     app.on('activate', () => {
         // On macOS, re-create window when dock icon is clicked

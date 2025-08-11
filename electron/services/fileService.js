@@ -276,7 +276,70 @@ class FileService {
         return filePath;
     }
 
-    // Deletar arquivo de lista
+    // Salvar lista de emails dividida em chunks
+    async saveEmailListChunked(basename, emails, chunkSize = 5000, format = 'txt') {
+        console.log('saveEmailListChunked chamada com:', {
+            basename,
+            emailsLength: emails.length,
+            chunkSize,
+            format,
+            emailsType: typeof emails,
+            firstEmail: emails[0]
+        });
+
+        if (!this.listsDirectory) {
+            throw new Error('Diretório de listas não configurado');
+        }
+
+        if (emails.length <= chunkSize) {
+            // Se a lista é menor que o chunk size, salva como arquivo único
+            const filename = `${basename}.${format}`;
+            console.log('Lista pequena, salvando como arquivo único:', filename);
+            const filePath = await this.saveEmailList(filename, emails, format);
+            return [{
+                filename,
+                path: filePath,
+                count: emails.length,
+                chunkNumber: 1
+            }];
+        }
+
+        const savedFiles = [];
+        const totalChunks = Math.ceil(emails.length / chunkSize);
+        console.log(`Lista grande, dividindo em ${totalChunks} chunks`);
+
+        for (let i = 0; i < totalChunks; i++) {
+            const startIndex = i * chunkSize;
+            const endIndex = Math.min(startIndex + chunkSize, emails.length);
+            const chunk = emails.slice(startIndex, endIndex);
+
+            const chunkNumber = i + 1;
+            const filename = `${basename}${chunkNumber}.${format}`;
+
+            console.log(`Salvando chunk ${chunkNumber}:`, {
+                filename,
+                chunkLength: chunk.length,
+                firstEmail: chunk[0],
+                lastEmail: chunk[chunk.length - 1]
+            });
+
+            try {
+                const filePath = await this.saveEmailList(filename, chunk, format);
+                savedFiles.push({
+                    filename,
+                    path: filePath,
+                    count: chunk.length,
+                    chunkNumber
+                });
+            } catch (error) {
+                console.error(`Erro ao salvar chunk ${chunkNumber}:`, error);
+                throw new Error(`Falha ao salvar arquivo ${filename}: ${error.message}`);
+            }
+        }
+
+        console.log('Todos os chunks salvos:', savedFiles);
+        return savedFiles;
+    }    // Deletar arquivo de lista
     async deleteEmailList(filename) {
         if (!this.listsDirectory) {
             throw new Error('Diretório de listas não configurado');

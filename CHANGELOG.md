@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2025-08-11
+
+### Added
+- **Email List Chunking**: Nova funcionalidade para dividir listas grandes automaticamente
+- **Chunked File Preview**: Prévia visual da divisão de arquivos no modal de importação
+- **Configurable Chunk Size**: Limite configurável de emails por arquivo (100-50.000)
+- **Sequential File Naming**: Nomenclatura automática sequencial (nome1.txt, nome2.txt, etc.)
+
+### Fixed
+- **Bug: Importar Lista**: Corrigido problema onde listas grandes não eram divididas conforme limite especificado
+- **File Splitting**: Implementada divisão automática baseada no parâmetro chunkSize
+- **Large File Handling**: Melhor tratamento de arquivos grandes com feedback de progresso
+
+### Changed
+- **Import Modal**: Interface melhorada com explicação clara da funcionalidade de divisão
+- **File Service**: Nova função `saveEmailListChunked()` para processamento otimizado
+- **Error Handling**: Tratamento de erros aprimorado com feedback detalhado
+
 ## [1.0.2] - 2025-08-11
 
 ### Changed
