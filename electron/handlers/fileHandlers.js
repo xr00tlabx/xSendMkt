@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import path from 'path';
 import FileService from '../services/fileService.js';
 
@@ -6,13 +6,16 @@ export function setupFileHandlers(getMainWindow) {
     // Directory selection
     ipcMain.handle('file:select-lists-directory', async () => {
         try {
+            // Get the currently focused window, or fallback to main window
+            const focusedWindow = BrowserWindow.getFocusedWindow();
             const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
+            const parentWindow = focusedWindow || mainWindow;
             
-            if (!mainWindow) {
-                return { success: false, error: 'Janela principal não disponível' };
+            if (!parentWindow) {
+                return { success: false, error: 'Nenhuma janela disponível' };
             }
 
-            const result = await dialog.showOpenDialog(mainWindow, {
+            const result = await dialog.showOpenDialog(parentWindow, {
                 title: 'Selecionar Diretório das Listas de Email',
                 properties: ['openDirectory'],
                 buttonLabel: 'Selecionar'
@@ -163,7 +166,16 @@ export function setupFileHandlers(getMainWindow) {
     // Select and import file
     ipcMain.handle('file:select-and-import', async () => {
         try {
-            const result = await dialog.showOpenDialog(mainWindow, {
+            // Get the currently focused window, or fallback to main window
+            const focusedWindow = BrowserWindow.getFocusedWindow();
+            const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
+            const parentWindow = focusedWindow || mainWindow;
+
+            if (!parentWindow) {
+                return { success: false, error: 'Nenhuma janela disponível' };
+            }
+
+            const result = await dialog.showOpenDialog(parentWindow, {
                 title: 'Importar Lista de Emails',
                 properties: ['openFile'],
                 filters: [

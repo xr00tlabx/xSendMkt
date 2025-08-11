@@ -377,12 +377,20 @@ ipcMain.handle('get-app-version', () => {
 });
 
 ipcMain.handle('show-open-dialog', async (event, options) => {
-    const result = await dialog.showOpenDialog(mainWindow, options);
+    // Get the currently focused window, or fallback to main window
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    const parentWindow = focusedWindow || mainWindow;
+
+    const result = await dialog.showOpenDialog(parentWindow, options);
     return result;
 });
 
 ipcMain.handle('show-save-dialog', async (event, options) => {
-    const result = await dialog.showSaveDialog(mainWindow, options);
+    // Get the currently focused window, or fallback to main window
+    const focusedWindow = BrowserWindow.getFocusedWindow();
+    const parentWindow = focusedWindow || mainWindow;
+
+    const result = await dialog.showSaveDialog(parentWindow, options);
     return result;
 });
 
