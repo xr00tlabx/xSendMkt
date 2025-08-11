@@ -67,6 +67,21 @@ function setupIpcHandlers() {
     // Pass mainWindow to handlers that need it
     setupFileHandlers(() => mainWindow);
     setupWindowHandlers(() => mainWindow);
+    
+    // Auto-updater IPC handlers
+    if (autoUpdaterService) {
+        ipcMain.handle('check-for-updates', () => {
+            autoUpdaterService.checkForUpdates();
+        });
+
+        ipcMain.handle('download-update', () => {
+            autoUpdaterService.downloadUpdate();
+        });
+
+        ipcMain.handle('quit-and-install', () => {
+            autoUpdaterService.quitAndInstall();
+        });
+    }
 }
 
 function createWindow() {
@@ -278,6 +293,35 @@ function createMenu() {
                     accelerator: 'CmdOrCtrl+,',
                     click: () => {
                         createSettingsWindow(mainWindow);
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Verificar Atualizações',
+                    click: () => {
+                        if (autoUpdaterService) {
+                            autoUpdaterService.checkForUpdates();
+                        } else {
+                            dialog.showMessageBox(mainWindow, {
+                                type: 'info',
+                                title: 'Verificar Atualizações',
+                                message: 'Verificação de atualizações não disponível',
+                                detail: 'A verificação automática de atualizações está disponível apenas na versão de produção.',
+                                buttons: ['OK']
+                            });
+                        }
+                    }
+                },
+                {
+                    label: 'Sobre',
+                    click: () => {
+                        dialog.showMessageBox(mainWindow, {
+                            type: 'info',
+                            title: 'Sobre xSendMkt',
+                            message: `xSendMkt v${app.getVersion()}`,
+                            detail: 'Sistema profissional de marketing por email com interface VS Code.\n\nDesenvolvido por xr00tlabx',
+                            buttons: ['OK']
+                        });
                     }
                 }
             ]

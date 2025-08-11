@@ -1,6 +1,8 @@
-import { autoUpdater } from 'electron-updater';
+import pkg from 'electron-updater';
+const { autoUpdater } = pkg;
 import { app, dialog, Notification } from 'electron';
-import log from 'electron-log';
+import logPkg from 'electron-log';
+const log = logPkg;
 
 class AutoUpdaterService {
     constructor() {
