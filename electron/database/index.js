@@ -1,7 +1,7 @@
-import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
-import path from 'path';
 import { app } from 'electron';
+import path from 'path';
+import { open } from 'sqlite';
+import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);

@@ -2,13 +2,65 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, Notification } from 'electro
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Import services and handlers
+import Database from './database/index.js';
+import { setupDatabaseHandlers } from './handlers/databaseHandlers.js';
+import { setupEmailHandlers } from './handlers/emailHandlers.js';
+import { setupFileHandlers } from './handlers/fileHandlers.js';
+import { setupWindowHandlers } from './handlers/windowHandlers.js';
+import EmailService from './services/emailService.js';
+import FileService from './services/fileService.js';
+import { getPreloadPath, isDev } from './utils/index.js';
+import {
+    closeAllModalWindows,
+    createCampaignWindow,
+    createEmailListsWindow,
+    createLoadSmtpsWindow,
+    createSettingsWindow,
+    createSmtpManagerWindow,
+    createStatisticsWindow,
+    createTestSmtpsWindow
+} from './utils/windowManager.js';
+
 // ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Keep a global reference of the window object
 let mainWindow;
+
+async function initializeServices() {
+    try {
+        // Initialize database
+        await Database.init();
+
+        // Initialize email service
+        await EmailService.init();
+
+        // Initialize file service
+        await FileService.init();
+
+    } catch (error) {
+        console.error('Error initializing services:', error);
+
+        // Show error dialog
+        dialog.showErrorBox(
+            'Erro de Inicialização',
+            `Falha ao inicializar os serviços do aplicativo:\n\n${error.message}\n\nO aplicativo será fechado.`
+        );
+
+        app.quit();
+    }
+}
+
+function setupIpcHandlers() {
+    // Setup all IPC handlers
+    setupDatabaseHandlers();
+    setupEmailHandlers();
+    // Pass mainWindow to handlers that need it
+    setupFileHandlers(() => mainWindow);
+    setupWindowHandlers(() => mainWindow);
+}
 
 function createWindow() {
     // Create the browser window
@@ -22,7 +74,7 @@ function createWindow() {
             contextIsolation: true,
             enableRemoteModule: false,
             webSecurity: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: getPreloadPath()
         },
         titleBarStyle: 'default',
         icon: path.join(__dirname, '../public/icon.png'), // You'll need to add an icon
@@ -32,10 +84,9 @@ function createWindow() {
 
     // Load the app
     const startUrl = isDev 
-        ? 'http://localhost:55622' 
+        ? 'http://localhost:55624' 
         : `file://${path.join(__dirname, '../dist/index.html')}`;
-    
-    console.log('Loading URL:', startUrl, 'isDev:', isDev);
+
     mainWindow.loadURL(startUrl);
 
     // Show window when ready to prevent visual flash
@@ -61,6 +112,21 @@ function createWindow() {
     mainWindow.on('unmaximize', () => {
         mainWindow.webContents.send('window-unmaximized');
     });
+
+    // Window event handlers
+    mainWindow.on('close', async (event) => {
+        // Close all modal windows first
+        closeAllModalWindows();
+
+        // Clean up services before closing
+        try {
+            EmailService.closeAllTransporters();
+            await Database.close();
+            console.log('Services cleaned up successfully');
+        } catch (error) {
+            console.error('Error cleaning up services:', error);
+        }
+    });
 }
 
 // Create application menu
@@ -73,7 +139,7 @@ function createMenu() {
                     label: 'New Campaign',
                     accelerator: 'CmdOrCtrl+N',
                     click: () => {
-                        mainWindow.webContents.send('menu-new-campaign');
+                        createCampaignWindow(mainWindow);
                     }
                 },
                 {
@@ -81,6 +147,14 @@ function createMenu() {
                     accelerator: 'CmdOrCtrl+S',
                     click: () => {
                         mainWindow.webContents.send('menu-save-campaign');
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Statistics',
+                    accelerator: 'CmdOrCtrl+T',
+                    click: () => {
+                        createStatisticsWindow(mainWindow);
                     }
                 },
                 { type: 'separator' },
@@ -97,9 +171,36 @@ function createMenu() {
             label: 'Lista',
             submenu: [
                 {
-                    label: 'Zerar Lista',
+                    label: 'Gerenciar Listas',
+                    accelerator: 'CmdOrCtrl+L',
                     click: () => {
-                        mainWindow.webContents.send('menu-clear-lists');
+                        createEmailListsWindow(mainWindow);
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Zerar Lista',
+                    click: async () => {
+                        const result = await dialog.showMessageBox(mainWindow, {
+                            type: 'warning',
+                            buttons: ['Cancelar', 'Zerar'],
+                            defaultId: 0,
+                            title: 'Confirmar',
+                            message: 'Tem certeza que deseja zerar todas as listas?',
+                            detail: 'Esta ação não pode ser desfeita.'
+                        });
+
+                        if (result.response === 1) {
+                            try {
+                                await FileService.clearAllLists();
+                                new Notification({
+                                    title: 'xSendMkt',
+                                    body: 'Todas as listas foram zeradas com sucesso!'
+                                }).show();
+                            } catch (error) {
+                                dialog.showErrorBox('Erro', `Erro ao zerar listas: ${error.message}`);
+                            }
+                        }
                     }
                 }
             ]
@@ -108,21 +209,49 @@ function createMenu() {
             label: 'SMTPs',
             submenu: [
                 {
-                    label: 'Zerar Lista',
+                    label: 'Gerenciar SMTPs',
+                    accelerator: 'CmdOrCtrl+M',
                     click: () => {
-                        mainWindow.webContents.send('menu-clear-smtps');
+                        createSmtpManagerWindow(mainWindow);
                     }
                 },
+                { type: 'separator' },
                 {
                     label: 'Carregar SMTPs',
                     click: () => {
-                        mainWindow.webContents.send('menu-load-smtps');
+                        createLoadSmtpsWindow(mainWindow);
                     }
                 },
                 {
                     label: 'Testar SMTPs',
                     click: () => {
-                        mainWindow.webContents.send('menu-test-smtps');
+                        createTestSmtpsWindow(mainWindow);
+                    }
+                },
+                { type: 'separator' },
+                {
+                    label: 'Zerar Lista',
+                    click: async () => {
+                        const result = await dialog.showMessageBox(mainWindow, {
+                            type: 'warning',
+                            buttons: ['Cancelar', 'Zerar'],
+                            defaultId: 0,
+                            title: 'Confirmar',
+                            message: 'Tem certeza que deseja zerar todos os SMTPs?',
+                            detail: 'Esta ação não pode ser desfeita.'
+                        });
+
+                        if (result.response === 1) {
+                            try {
+                                await Database.clearAllSmtps();
+                                new Notification({
+                                    title: 'xSendMkt',
+                                    body: 'Todos os SMTPs foram zerados com sucesso!'
+                                }).show();
+                            } catch (error) {
+                                dialog.showErrorBox('Erro', `Erro ao zerar SMTPs: ${error.message}`);
+                            }
+                        }
                     }
                 }
             ]
@@ -134,7 +263,7 @@ function createMenu() {
                     label: 'Abrir Configurações',
                     accelerator: 'CmdOrCtrl+,',
                     click: () => {
-                        mainWindow.webContents.send('menu-open-settings');
+                        createSettingsWindow(mainWindow);
                     }
                 }
             ]
@@ -173,8 +302,17 @@ function createMenu() {
 }
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // Initialize services first
+    await initializeServices();
+
+    // Create window
     createWindow();
+
+    // Setup IPC handlers
+    setupIpcHandlers();
+
+    // Create menu
     createMenu();
 
     app.on('activate', () => {
@@ -190,6 +328,21 @@ app.on('window-all-closed', () => {
     // On macOS, keep app running even when all windows are closed
     if (process.platform !== 'darwin') {
         app.quit();
+    }
+});
+
+// Cleanup before quit
+app.on('before-quit', async () => {
+    try {
+        // Close all modal windows
+        closeAllModalWindows();
+
+        // Clean up services
+        EmailService.closeAllTransporters();
+        await Database.close();
+        console.log('Application cleanup completed');
+    } catch (error) {
+        console.error('Error during cleanup:', error);
     }
 });
 
@@ -210,7 +363,7 @@ app.on('web-contents-created', (event, contents) => {
     });
 });
 
-// IPC handlers
+// Legacy IPC handlers (keeping for compatibility)
 ipcMain.handle('get-app-version', () => {
     return app.getVersion();
 });

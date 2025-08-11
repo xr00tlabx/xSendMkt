@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "electron .",
-    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:55622 && electron .\"",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:55624 && electron .\"",
     "build:electron": "npm run build && electron-builder",
     "dist": "npm run build && electron-builder --publish=never",
     "dist:win": "npm run build && electron-builder --win",
@@ -30,6 +30,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.0",
+    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
