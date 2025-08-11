@@ -10,6 +10,7 @@ import { setupFileHandlers } from './handlers/fileHandlers.js';
 import { setupWindowHandlers } from './handlers/windowHandlers.js';
 import EmailService from './services/emailService.js';
 import FileService from './services/fileService.js';
+import AutoUpdaterService from './services/autoUpdaterService.js';
 import { getPreloadPath, isDev } from './utils/index.js';
 import {
     closeAllModalWindows,
@@ -28,6 +29,7 @@ const __dirname = path.dirname(__filename);
 
 // Keep a global reference of the window object
 let mainWindow;
+let autoUpdaterService;
 
 async function initializeServices() {
     try {
@@ -39,6 +41,11 @@ async function initializeServices() {
 
         // Initialize file service
         await FileService.init();
+
+        // Initialize auto-updater (only in production)
+        if (!isDev) {
+            autoUpdaterService = new AutoUpdaterService();
+        }
 
     } catch (error) {
         console.error('Error initializing services:', error);
@@ -403,4 +410,23 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 
 ipcMain.handle('show-notification', async (event, { title, body }) => {
     new Notification({ title, body }).show();
+});
+
+// Auto-updater IPC handlers
+ipcMain.handle('check-for-updates', () => {
+    if (autoUpdaterService) {
+        autoUpdaterService.checkForUpdates();
+    }
+});
+
+ipcMain.handle('download-update', () => {
+    if (autoUpdaterService) {
+        autoUpdaterService.downloadUpdate();
+    }
+});
+
+ipcMain.handle('quit-and-install', () => {
+    if (autoUpdaterService) {
+        autoUpdaterService.quitAndInstall();
+    }
 });

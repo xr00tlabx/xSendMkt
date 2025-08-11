@@ -18,12 +18,17 @@
     "dist": "npm run build && electron-builder --publish=never",
     "dist:win": "npm run build && electron-builder --win",
     "dist:mac": "npm run build && electron-builder --mac",
-    "dist:linux": "npm run build && electron-builder --linux"
+    "dist:linux": "npm run build && electron-builder --linux",
+    "publish": "npm run build && electron-builder --publish=always",
+    "publish:win": "npm run build && electron-builder --win --publish=always",
+    "publish:mac": "npm run build && electron-builder --mac --publish=always",
+    "publish:linux": "npm run build && electron-builder --linux --publish=always"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@types/nodemailer": "^6.4.17",
     "axios": "^1.11.0",
+    "electron-log": "^5.4.2",
     "electron-store": "^10.1.0",
     "lucide-react": "^0.539.0",
     "nodemailer": "^7.0.5",
@@ -43,6 +48,7 @@
     "concurrently": "^9.2.0",
     "electron": "^37.2.6",
     "electron-builder": "^26.0.12",
+    "electron-updater": "^6.6.2",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -71,6 +77,12 @@
         "to": "icon.png"
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "SEU_USERNAME_GITHUB",
+      "repo": "xSendMkt",
+      "private": false
+    },
     "mac": {
       "category": "public.app-category.business",
       "target": [
@@ -93,7 +105,8 @@
           ]
         }
       ],
-      "icon": "public/icon.ico"
+      "icon": "public/icon.ico",
+      "publisherName": "xSendMkt Team"
     },
     "linux": {
       "target": [

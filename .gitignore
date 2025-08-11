@@ -10,7 +10,34 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-electron
 *.local
+
+# Electron specific
+app/
+release/
+*.dmg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.exe
+*.msi
+
+# Auto-updater
+update-cache/
+updates/
+releases/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Application data
+data/
+storage/
+config/user-data.json
 
 # Editor directories and files
 .vscode/*
