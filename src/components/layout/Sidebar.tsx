@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     const activeSmtps = smtpConfigs.filter(smtp => smtp.isActive);
 
     return (
-        <div className="w-80 vscode-sidebar border-r flex flex-col overflow-hidden" style={{ borderRightColor: 'var(--vscode-border)' }}>
+        <div className="w-full h-full vscode-sidebar border-r flex flex-col overflow-hidden" style={{ borderRightColor: 'var(--vscode-border)' }}>
             {/* Email Lists Section */}
             <div className="basis-1/2 min-h-0 flex flex-col border-b" style={{ borderBottomColor: 'var(--vscode-border)' }}>
                 <div className="p-4 flex items-center justify-between" style={{ background: 'rgba(0,122,204,0.06)', borderLeft: '3px solid var(--vscode-accent)' }}>
