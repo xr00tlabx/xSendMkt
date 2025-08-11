@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-08-11
+
+### Changed
+- **Code Organization**: Reorganized imports in main.js and autoUpdaterService.js for better structure
+- **Import Order**: Grouped related imports together following consistent patterns
+- **Code Quality**: Improved code readability and maintainability
+
+### Fixed
+- **Import Dependencies**: Resolved import ordering issues in Electron main process
+- **Auto-updater Service**: Fixed module import structure for better compatibility
+
+## [1.0.1] - 2025-01-10
+
+### Added
+- **Auto-updater Integration**: GitHub releases integration with electron-updater
+- **GitHub Actions**: Automated build pipeline for Windows, macOS, and Linux
+- **Release Management**: Automatic release creation and distribution
+- **Update Notifications**: In-app update checking and installation
+
+### Fixed
+- **TypeScript Compilation**: Resolved all TypeScript errors preventing builds
+- **API Integration**: Fixed type conversion issues between Electron and React
+- **Campaign Management**: Fixed unused function imports and type mismatches
+
 ## [1.0.0] - 2025-01-10
 
 ### Added
