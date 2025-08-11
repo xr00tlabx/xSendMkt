@@ -2,7 +2,7 @@
   "name": "xsendmkt",
   "productName": "xSendMkt",
   "description": "Professional Email Marketing Desktop Application",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "electron/main.js",
   "homepage": "./",
   "private": true,
