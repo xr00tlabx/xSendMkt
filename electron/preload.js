@@ -1,9 +1,9 @@
-import { contextBridge, ipcRenderer } from 'electron';
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-    // Menu actions
+    // Menu actions - File
     onMenuAction: (callback) => {
         ipcRenderer.on('menu-new-campaign', callback);
         ipcRenderer.on('menu-save-campaign', callback);
@@ -11,6 +11,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('menu-pause-campaign', callback);
         ipcRenderer.on('menu-preview-email', callback);
         ipcRenderer.on('menu-about', callback);
+    },
+
+    // Menu actions - New menus
+    on: (channel, callback) => {
+        const validChannels = [
+            'menu-clear-lists',
+            'menu-clear-smtps',
+            'menu-load-smtps',
+            'menu-test-smtps',
+            'menu-open-settings',
+            'window-maximized',
+            'window-unmaximized'
+        ];
+        if (validChannels.includes(channel)) {
+            ipcRenderer.on(channel, callback);
+        }
     },
     
     // Window state

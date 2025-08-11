@@ -11,7 +11,7 @@ const HomePage: React.FC = () => {
 
     const [selectedLists, setSelectedLists] = useState<string[]>([]);
     const [currentCampaign, setCurrentCampaign] = useState<EmailCampaign | null>(null);
-    const [sidebarWidth, setSidebarWidth] = useState(140);
+    const [sidebarWidth, setSidebarWidth] = useState(240);
     const [isResizing, setIsResizing] = useState(false);
     const sidebarRef = useRef<HTMLDivElement>(null);
 

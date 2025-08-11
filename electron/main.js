@@ -1,11 +1,11 @@
-import { app, BrowserWindow, Menu } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 // ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -21,7 +21,8 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             enableRemoteModule: false,
-            webSecurity: true
+            webSecurity: true,
+            preload: path.join(__dirname, 'preload.js')
         },
         titleBarStyle: 'default',
         icon: path.join(__dirname, '../public/icon.png'), // You'll need to add an icon
@@ -34,6 +35,7 @@ function createWindow() {
         ? 'http://localhost:55622' 
         : `file://${path.join(__dirname, '../dist/index.html')}`;
     
+    console.log('Loading URL:', startUrl, 'isDev:', isDev);
     mainWindow.loadURL(startUrl);
 
     // Show window when ready to prevent visual flash
@@ -92,78 +94,47 @@ function createMenu() {
             ]
         },
         {
-            label: 'Edit',
-            submenu: [
-                { role: 'undo' },
-                { role: 'redo' },
-                { type: 'separator' },
-                { role: 'cut' },
-                { role: 'copy' },
-                { role: 'paste' },
-                { role: 'selectall' }
-            ]
-        },
-        {
-            label: 'View',
-            submenu: [
-                { role: 'reload' },
-                { role: 'forceReload' },
-                { role: 'toggleDevTools' },
-                { type: 'separator' },
-                { role: 'resetZoom' },
-                { role: 'zoomIn' },
-                { role: 'zoomOut' },
-                { type: 'separator' },
-                { role: 'togglefullscreen' }
-            ]
-        },
-        {
-            label: 'Campaign',
+            label: 'Lista',
             submenu: [
                 {
-                    label: 'Send Campaign',
-                    accelerator: 'CmdOrCtrl+Enter',
+                    label: 'Zerar Lista',
                     click: () => {
-                        mainWindow.webContents.send('menu-send-campaign');
-                    }
-                },
-                {
-                    label: 'Pause Campaign',
-                    accelerator: 'CmdOrCtrl+P',
-                    click: () => {
-                        mainWindow.webContents.send('menu-pause-campaign');
-                    }
-                },
-                { type: 'separator' },
-                {
-                    label: 'Preview Email',
-                    accelerator: 'CmdOrCtrl+Shift+P',
-                    click: () => {
-                        mainWindow.webContents.send('menu-preview-email');
+                        mainWindow.webContents.send('menu-clear-lists');
                     }
                 }
             ]
         },
         {
-            label: 'Window',
-            submenu: [
-                { role: 'minimize' },
-                { role: 'close' }
-            ]
-        },
-        {
-            label: 'Help',
+            label: 'SMTPs',
             submenu: [
                 {
-                    label: 'About xSendMkt',
+                    label: 'Zerar Lista',
                     click: () => {
-                        mainWindow.webContents.send('menu-about');
+                        mainWindow.webContents.send('menu-clear-smtps');
                     }
                 },
                 {
-                    label: 'Documentation',
+                    label: 'Carregar SMTPs',
                     click: () => {
-                        require('electron').shell.openExternal('https://github.com/your-username/xSendMkt');
+                        mainWindow.webContents.send('menu-load-smtps');
+                    }
+                },
+                {
+                    label: 'Testar SMTPs',
+                    click: () => {
+                        mainWindow.webContents.send('menu-test-smtps');
+                    }
+                }
+            ]
+        },
+        {
+            label: 'Configurações',
+            submenu: [
+                {
+                    label: 'Abrir Configurações',
+                    accelerator: 'CmdOrCtrl+,',
+                    click: () => {
+                        mainWindow.webContents.send('menu-open-settings');
                     }
                 }
             ]
@@ -237,4 +208,23 @@ app.on('web-contents-created', (event, contents) => {
             event.preventDefault();
         }
     });
+});
+
+// IPC handlers
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
+ipcMain.handle('show-open-dialog', async (event, options) => {
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    return result;
+});
+
+ipcMain.handle('show-save-dialog', async (event, options) => {
+    const result = await dialog.showSaveDialog(mainWindow, options);
+    return result;
+});
+
+ipcMain.handle('show-notification', async (event, { title, body }) => {
+    new Notification({ title, body }).show();
 });

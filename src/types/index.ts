@@ -52,3 +52,16 @@ export interface ApiConfig {
     useMock: boolean;
     baseUrl: string;
 }
+
+export interface AppSettings {
+    threads: number;
+    timeout: number;
+    proxies: string[];
+}
+
+export interface ProxyTestResult {
+    proxy: string;
+    status: 'success' | 'failed';
+    responseTime?: number;
+    error?: string;
+}

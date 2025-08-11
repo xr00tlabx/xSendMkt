@@ -1,56 +1,149 @@
-import { Code } from 'lucide-react';
-import React from 'react';
-import { apiConfig, toggleMockApi } from '../../services/apiConfig';
+import React, { useEffect, useState } from 'react';
+import type { AppSettings, SmtpConfig } from '../../types';
+import { ConfirmModal, LoadSmtpsModal, SettingsModal, TestSmtpsModal } from '../modals';
 
 const Header: React.FC = () => {
-    const handleToggleMock = () => {
-        toggleMockApi(!apiConfig.useMock);
-        window.location.reload(); // Reload to apply changes
+    const [showClearListsModal, setShowClearListsModal] = useState(false);
+    const [showClearSmtpsModal, setShowClearSmtpsModal] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [showLoadSmtpsModal, setShowLoadSmtpsModal] = useState(false);
+    const [showTestSmtpsModal, setShowTestSmtpsModal] = useState(false);
+    const [smtps, setSmtps] = useState<SmtpConfig[]>([]);
+
+    useEffect(() => {
+        // Load SMTPs from localStorage
+        const loadSmtps = () => {
+            const savedSmtps = localStorage.getItem('smtpConfigs');
+            if (savedSmtps) {
+                setSmtps(JSON.parse(savedSmtps));
+            }
+        };
+
+        // Listen to Electron menu events
+        const handleMenuEvents = () => {
+            // Check if we're in Electron environment
+            if (typeof window !== 'undefined' && window.electronAPI) {
+                console.log('Setting up Electron menu listeners...');
+
+                window.electronAPI.on('menu-clear-lists', () => {
+                    console.log('Menu clear lists triggered');
+                    setShowClearListsModal(true);
+                });
+
+                window.electronAPI.on('menu-clear-smtps', () => {
+                    console.log('Menu clear smtps triggered');
+                    setShowClearSmtpsModal(true);
+                });
+
+                window.electronAPI.on('menu-load-smtps', () => {
+                    console.log('Menu load smtps triggered');
+                    setShowLoadSmtpsModal(true);
+                });
+
+                window.electronAPI.on('menu-test-smtps', () => {
+                    console.log('Menu test smtps triggered');
+                    loadSmtps();
+                    setShowTestSmtpsModal(true);
+                });
+
+                window.electronAPI.on('menu-open-settings', () => {
+                    console.log('Menu settings triggered');
+                    setShowSettingsModal(true);
+                });
+            } else {
+                console.log('ElectronAPI not available, retrying in 100ms...');
+                setTimeout(handleMenuEvents, 100);
+            }
+        };
+
+        loadSmtps();
+        handleMenuEvents();
+
+        // Cleanup listeners on unmount
+        return () => {
+            if (typeof window !== 'undefined' && window.electronAPI) {
+                window.electronAPI.removeAllListeners('menu-clear-lists');
+                window.electronAPI.removeAllListeners('menu-clear-smtps');
+                window.electronAPI.removeAllListeners('menu-load-smtps');
+                window.electronAPI.removeAllListeners('menu-test-smtps');
+                window.electronAPI.removeAllListeners('menu-open-settings');
+            }
+        };
+    }, []);
+
+    const handleClearLists = () => {
+        localStorage.removeItem('emailLists');
+        setShowClearListsModal(false);
+        window.location.reload();
+    };
+
+    const handleClearSmtps = () => {
+        localStorage.removeItem('smtpConfigs');
+        setSmtps([]);
+        setShowClearSmtpsModal(false);
+        window.location.reload();
+    };
+
+    const handleLoadSmtps = (newSmtps: SmtpConfig[]) => {
+        const existingSmtps = JSON.parse(localStorage.getItem('smtpConfigs') || '[]');
+        const allSmtps = [...existingSmtps, ...newSmtps];
+        localStorage.setItem('smtpConfigs', JSON.stringify(allSmtps));
+        setSmtps(allSmtps);
+        window.location.reload();
+    };
+
+    const handleSaveSettings = (settings: AppSettings) => {
+        // Settings are already saved in the modal
+        console.log('Settings saved:', settings);
     };
 
     return (
-        <header className="vscode-panel border-b" style={{ borderBottomColor: 'var(--vscode-border)' }}>
-            <div className="px-6">
-                <div className="flex justify-between items-center h-14">
-                    {/* Logo */}
-                    <div className="flex items-center">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-md" style={{ background: 'var(--vscode-accent)' }}>
-                            <Code className="h-5 w-5 text-white" />
-                        </div>
-                        <span className="ml-3 text-lg font-semibold" style={{ color: 'var(--vscode-text)' }}>
-                            xSendMkt
-                        </span>
-                        <span className="ml-2 text-xs px-2 py-1 rounded-md" style={{
-                            background: 'var(--vscode-input-bg)',
-                            color: 'var(--vscode-text-muted)'
-                        }}>
-                            Email Marketing
-                        </span>
-                    </div>
+        <>
+            <header className="vscode-panel border-b" style={{ borderBottomColor: 'var(--vscode-border)' }}>
+                {/* You can add header content here if needed */}
+            </header>
 
-                    {/* API Mode Toggle */}
-                    <div className="flex items-center space-x-3">
-                        <span className="text-sm" style={{ color: 'var(--vscode-text-muted)' }}>
-                            API Mode:
-                        </span>
-                        <button
-                            onClick={handleToggleMock}
-                            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 border ${apiConfig.useMock
-                                ? 'border-yellow-500/30 text-yellow-400'
-                                : 'border-green-500/30 text-green-400'
-                                }`}
-                            style={{
-                                background: apiConfig.useMock
-                                    ? 'rgba(255, 204, 2, 0.1)'
-                                    : 'rgba(78, 201, 176, 0.1)'
-                            }}
-                        >
-                            {apiConfig.useMock ? '🧪 Mock' : '🚀 Live'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
+            {/* Modals */}
+            <ConfirmModal
+                isOpen={showClearListsModal}
+                onClose={() => setShowClearListsModal(false)}
+                onConfirm={handleClearLists}
+                title="Confirmar Limpeza"
+                message="Tem certeza que deseja zerar todas as listas de emails? Esta ação não pode ser desfeita."
+                confirmText="Zerar Listas"
+                cancelText="Cancelar"
+                variant="danger"
+            />
+
+            <ConfirmModal
+                isOpen={showClearSmtpsModal}
+                onClose={() => setShowClearSmtpsModal(false)}
+                onConfirm={handleClearSmtps}
+                title="Confirmar Limpeza"
+                message="Tem certeza que deseja zerar todos os SMTPs? Esta ação não pode ser desfeita."
+                confirmText="Zerar SMTPs"
+                cancelText="Cancelar"
+                variant="danger"
+            />
+
+            <SettingsModal
+                isOpen={showSettingsModal}
+                onClose={() => setShowSettingsModal(false)}
+                onSave={handleSaveSettings}
+            />
+
+            <LoadSmtpsModal
+                isOpen={showLoadSmtpsModal}
+                onClose={() => setShowLoadSmtpsModal(false)}
+                onLoad={handleLoadSmtps}
+            />
+
+            <TestSmtpsModal
+                isOpen={showTestSmtpsModal}
+                onClose={() => setShowTestSmtpsModal(false)}
+                smtps={smtps}
+            />
+        </>
     );
 };
 
