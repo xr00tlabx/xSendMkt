@@ -14,15 +14,18 @@ function App() {
     const isModalWindow = window.location.search.includes('t=');
 
     console.log('App starting - isModal:', isModalWindow, 'URL:', window.location.href);
+    console.log('Full location:', window.location);
 
     // If it's a modal window, render modal content directly
     if (isModalWindow) {
         const path = window.location.hash.replace('#', '');
 
         console.log('Modal mode - path:', path);
+        console.log('Rendering settings page for modal');
 
         switch (path) {
             case '/settings':
+                console.log('Rendering SettingsPage in modal');
                 return (
                     <ModalLayout title="Configurações">
                         <SettingsPage />

@@ -3,20 +3,29 @@ import path from 'path';
 import FileService from '../services/fileService.js';
 
 export function setupFileHandlers(getMainWindow) {
+    console.log('Configurando file handlers...');
+    
     // Directory selection
     ipcMain.handle('file:select-lists-directory', async () => {
+        console.log('Handler file:select-lists-directory chamado!');
         try {
             const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
+            console.log('MainWindow obtida:', !!mainWindow);
             
             if (!mainWindow) {
-                throw new Error('Janela principal não disponível');
+                console.error('Janela principal não disponível');
+                return { success: false, error: 'Janela principal não disponível' };
             }
+
+            console.log('Abrindo diálogo de seleção de diretório...');
 
             const result = await dialog.showOpenDialog(mainWindow, {
                 title: 'Selecionar Diretório das Listas de Email',
                 properties: ['openDirectory'],
                 buttonLabel: 'Selecionar'
             });
+
+            console.log('Resultado do diálogo:', result);
 
             if (!result.canceled && result.filePaths.length > 0) {
                 const directory = result.filePaths[0];
@@ -27,6 +36,7 @@ export function setupFileHandlers(getMainWindow) {
                 return { success: true, directory };
             }
 
+            console.log('Seleção cancelada pelo usuário');
             return { success: false, canceled: true };
         } catch (error) {
             console.error('Error selecting directory:', error);
@@ -37,11 +47,13 @@ export function setupFileHandlers(getMainWindow) {
     // Set lists directory
     ipcMain.handle('file:set-lists-directory', async (event, directory) => {
         try {
-            await FileService.setListsDirectory(directory);
+            console.log('Handler setListsDirectory chamado com:', directory);
+            const result = await FileService.setListsDirectory(directory);
+            console.log('Resultado do FileService.setListsDirectory:', result);
             return { success: true };
         } catch (error) {
             console.error('Error setting lists directory:', error);
-            throw error;
+            return { success: false, error: error.message };
         }
     });
 

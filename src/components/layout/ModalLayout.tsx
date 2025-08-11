@@ -6,6 +6,8 @@ interface ModalLayoutProps {
 }
 
 const ModalLayout: React.FC<ModalLayoutProps> = ({ children, title }) => {
+    console.log('ModalLayout rendering with title:', title);
+    
     return (
         <div className="min-h-screen bg-gray-50">
             {title && (

@@ -1,37 +1,94 @@
-import { apiConfig } from './apiConfig';
-import { mockApi } from './mockApi';
-import { realApi } from './realApi';
-
-// Main API service that switches between mock and real API
+// Real API service using SQLite via Electron
 export const apiService = {
     // Email Lists
-    getEmailLists: () => apiConfig.useMock ? mockApi.getEmailLists() : realApi.getEmailLists(),
-    createEmailList: (data: Parameters<typeof mockApi.createEmailList>[0]) =>
-        apiConfig.useMock ? mockApi.createEmailList(data) : realApi.createEmailList(data),
-    updateEmailList: (id: string, data: Parameters<typeof mockApi.updateEmailList>[1]) =>
-        apiConfig.useMock ? mockApi.updateEmailList(id, data) : realApi.updateEmailList(id, data),
-    deleteEmailList: (id: string) =>
-        apiConfig.useMock ? mockApi.deleteEmailList(id) : realApi.deleteEmailList(id),
+    getEmailLists: () => window.electronAPI?.files?.getEmailLists() || Promise.resolve([]),
+
+    readEmailList: (filename: string) =>
+        window.electronAPI?.files?.readEmails(filename) || Promise.resolve([]),
+
+    saveEmailList: (filename: string, emails: any[], format?: string) =>
+        window.electronAPI?.files?.saveEmailList(filename, emails, format) || Promise.resolve(''),
+
+    deleteEmailList: (filename: string) =>
+        window.electronAPI?.files?.deleteEmailList(filename) || Promise.resolve(false),
 
     // SMTP Configs
-    getSmtpConfigs: () => apiConfig.useMock ? mockApi.getSmtpConfigs() : realApi.getSmtpConfigs(),
-    createSmtpConfig: (data: Parameters<typeof mockApi.createSmtpConfig>[0]) =>
-        apiConfig.useMock ? mockApi.createSmtpConfig(data) : realApi.createSmtpConfig(data),
-    updateSmtpConfig: (id: string, data: Parameters<typeof mockApi.updateSmtpConfig>[1]) =>
-        apiConfig.useMock ? mockApi.updateSmtpConfig(id, data) : realApi.updateSmtpConfig(id, data),
-    deleteSmtpConfig: (id: string) =>
-        apiConfig.useMock ? mockApi.deleteSmtpConfig(id) : realApi.deleteSmtpConfig(id),
+    getSmtpConfigs: () => window.electronAPI?.database?.getAllSmtps() || Promise.resolve([]),
+
+    createSmtpConfig: (data: any) =>
+        window.electronAPI?.database?.addSmtp(data) || Promise.resolve(0),
+
+    updateSmtpConfig: (id: number, data: any) =>
+        window.electronAPI?.database?.updateSmtp(id, data) || Promise.resolve(false),
+
+    deleteSmtpConfig: (id: number) =>
+        window.electronAPI?.database?.deleteSmtp(id) || Promise.resolve(false),
+
+    clearAllSmtps: () =>
+        window.electronAPI?.database?.clearAllSmtps() || Promise.resolve(false),
 
     // Campaigns
-    getCampaigns: () => apiConfig.useMock ? mockApi.getCampaigns() : realApi.getCampaigns(),
-    createCampaign: (data: Parameters<typeof mockApi.createCampaign>[0]) =>
-        apiConfig.useMock ? mockApi.createCampaign(data) : realApi.createCampaign(data),
-    updateCampaign: (id: string, data: Parameters<typeof mockApi.updateCampaign>[1]) =>
-        apiConfig.useMock ? mockApi.updateCampaign(id, data) : realApi.updateCampaign(id, data),
-    sendCampaign: (id: string) =>
-        apiConfig.useMock ? mockApi.sendCampaign(id) : realApi.sendCampaign(id),
-    pauseCampaign: (id: string) =>
-        apiConfig.useMock ? mockApi.pauseCampaign(id) : realApi.pauseCampaign(id),
-    getSendingStats: (campaignId: string) =>
-        apiConfig.useMock ? mockApi.getSendingStats(campaignId) : realApi.getSendingStats(campaignId),
+    getCampaigns: () => window.electronAPI?.database?.getAllCampaigns() || Promise.resolve([]),
+
+    saveCampaign: (data: any) =>
+        window.electronAPI?.database?.saveCampaign(data) || Promise.resolve(0),
+
+    getCampaign: (id: number) =>
+        window.electronAPI?.database?.getCampaign(id) || Promise.resolve(null),
+
+    // Email Operations
+    testSmtp: (smtpConfig: any) =>
+        window.electronAPI?.email?.testSmtp(smtpConfig) || Promise.resolve({ success: false }),
+
+    testAllSmtps: () =>
+        window.electronAPI?.email?.testAllSmtps() || Promise.resolve([]),
+
+    sendEmail: (emailData: any, smtpId: number) =>
+        window.electronAPI?.email?.sendSingle(emailData, smtpId) || Promise.resolve({}),
+
+    addToQueue: (emails: any[], campaignId?: number) =>
+        window.electronAPI?.email?.addToQueue(emails, campaignId) || Promise.resolve({ success: false }),
+
+    pauseQueue: () =>
+        window.electronAPI?.email?.pauseQueue() || Promise.resolve({ success: false }),
+
+    resumeQueue: () =>
+        window.electronAPI?.email?.resumeQueue() || Promise.resolve({ success: false }),
+
+    clearQueue: () =>
+        window.electronAPI?.email?.clearQueue() || Promise.resolve({ success: false }),
+
+    getQueueStatus: () =>
+        window.electronAPI?.email?.getQueueStatus() || Promise.resolve({
+            pending: 0,
+            sending: 0,
+            sent: 0,
+            failed: 0
+        }),
+
+    // Settings
+    getSetting: (key: string) =>
+        window.electronAPI?.database?.getSetting(key) || Promise.resolve(null),
+
+    setSetting: (key: string, value: any, type?: string) =>
+        window.electronAPI?.database?.setSetting(key, value, type) || Promise.resolve(false),
+
+    getAllSettings: () =>
+        window.electronAPI?.database?.getAllSettings() || Promise.resolve({}),
+
+    // File Operations
+    selectListsDirectory: () =>
+        window.electronAPI?.files?.selectListsDirectory() || Promise.resolve({ success: false }),
+
+    setListsDirectory: (directory: string) =>
+        window.electronAPI?.files?.setListsDirectory(directory) || Promise.resolve({ success: false }),
+
+    getListsDirectory: () =>
+        window.electronAPI?.files?.getListsDirectory() || Promise.resolve(''),
+
+    // Logs
+    getEmailLogs: (campaignId?: number, limit?: number) =>
+        window.electronAPI?.database?.getEmailLogs(campaignId, limit) || Promise.resolve([])
 };
+
+export default apiService;

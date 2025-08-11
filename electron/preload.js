@@ -1,5 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+console.log('Preload script iniciado');
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -51,7 +53,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     // File API
     files: {
-        selectListsDirectory: () => ipcRenderer.invoke('file:select-lists-directory'),
+        selectListsDirectory: () => {
+            console.log('Preload: selectListsDirectory chamado');
+            return ipcRenderer.invoke('file:select-lists-directory');
+        },
         setListsDirectory: (directory) => ipcRenderer.invoke('file:set-lists-directory', directory),
         getListsDirectory: () => ipcRenderer.invoke('file:get-lists-directory'),
         getEmailLists: () => ipcRenderer.invoke('file:get-email-lists'),
@@ -113,3 +118,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Cleanup
     removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
 });
+
+console.log('Preload script finalizado - electronAPI exposto com sucesso');

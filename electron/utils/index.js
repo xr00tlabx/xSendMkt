@@ -26,7 +26,7 @@ export function getAssetPath(assetPath) {
 }
 
 export function getPreloadPath() {
-    return path.join(__dirname, 'preload.js');
+    return path.join(__dirname, '../preload.js');
 }
 
 export function formatBytes(bytes, decimals = 2) {

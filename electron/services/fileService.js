@@ -8,29 +8,44 @@ class FileService {
     }
 
     async init() {
-        // Carregar diretório das listas das configurações
-        const listsDir = await Database.getSetting('lists_directory');
-        if (listsDir) {
-            this.listsDirectory = listsDir;
+        try {
+            // Carregar diretório das listas das configurações
+            console.log('Inicializando FileService...');
+            const listsDir = await Database.getSetting('lists_directory');
+            console.log('Diretório das listas carregado do banco:', listsDir);
+
+            if (listsDir) {
+                this.listsDirectory = listsDir;
+                console.log('Diretório das listas definido:', this.listsDirectory);
+            }
+        } catch (error) {
+            console.error('Erro ao inicializar FileService:', error);
         }
     }
 
     // Definir diretório das listas
     async setListsDirectory(directory) {
         try {
+            console.log('Tentando definir diretório:', directory);
+
             // Verificar se o diretório existe
             await fs.access(directory);
+            console.log('Diretório existe e é acessível');
 
             this.listsDirectory = directory;
-            await Database.setSetting('lists_directory', directory);
+            const result = await Database.setSetting('lists_directory', directory);
+            console.log('Resultado do setSetting:', result);
+
             return true;
         } catch (error) {
+            console.error('Erro ao definir diretório:', error);
             throw new Error(`Diretório não existe ou não é acessível: ${directory}`);
         }
     }
 
     // Obter diretório das listas
     getListsDirectory() {
+        console.log('Retornando diretório atual:', this.listsDirectory);
         return this.listsDirectory;
     }
 

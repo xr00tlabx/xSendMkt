@@ -315,6 +315,14 @@ app.whenReady().then(async () => {
     // Create menu
     createMenu();
 
+    // Em desenvolvimento, abrir configurações automaticamente para teste
+    if (isDev) {
+        setTimeout(() => {
+            console.log('Abrindo configurações automaticamente para desenvolvimento...');
+            createSettingsWindow(mainWindow);
+        }, 2000);
+    }
+
     app.on('activate', () => {
         // On macOS, re-create window when dock icon is clicked
         if (BrowserWindow.getAllWindows().length === 0) {

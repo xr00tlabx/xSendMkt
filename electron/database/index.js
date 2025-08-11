@@ -10,9 +10,27 @@ const __dirname = path.dirname(__filename);
 class Database {
     constructor() {
         this.db = null;
+        this.initialized = false;
+        this.initPromise = null;
     }
 
     async init() {
+        // Se já estiver inicializado, retorna a conexão existente
+        if (this.initialized && this.db) {
+            return this.db;
+        }
+
+        // Se já estiver inicializando, aguarda a promessa existente
+        if (this.initPromise) {
+            return this.initPromise;
+        }
+
+        // Cria uma nova promessa de inicialização
+        this.initPromise = this._performInit();
+        return this.initPromise;
+    }
+
+    async _performInit() {
         try {
             const dbPath = path.join(app.getPath('userData'), 'xsendmkt.db');
             console.log('Database path:', dbPath);
@@ -23,9 +41,12 @@ class Database {
             });
 
             await this.createTables();
+            this.initialized = true;
+            this.initPromise = null; // Limpa a promessa após sucesso
             console.log('Database initialized successfully');
             return this.db;
         } catch (error) {
+            this.initPromise = null; // Limpa a promessa em caso de erro
             console.error('Error initializing database:', error);
             throw error;
         }
@@ -107,7 +128,6 @@ class Database {
             { key: 'lists_directory', value: '', type: 'string' },
             { key: 'max_concurrent_emails', value: '5', type: 'number' },
             { key: 'delay_between_emails', value: '1000', type: 'number' },
-            { key: 'api_mode', value: 'mock', type: 'string' },
             { key: 'auto_save_campaigns', value: 'true', type: 'boolean' }
         ];
 
@@ -122,6 +142,7 @@ class Database {
     // Métodos para configurações
     async getSetting(key) {
         try {
+            await this.ensureConnection();
             const result = await this.db.get('SELECT * FROM settings WHERE key = ?', [key]);
             if (!result) return null;
 
@@ -144,6 +165,7 @@ class Database {
 
     async setSetting(key, value, type = 'string') {
         try {
+            await this.ensureConnection();
             let stringValue = value;
             if (type === 'json') {
                 stringValue = JSON.stringify(value);
@@ -375,7 +397,24 @@ class Database {
     async close() {
         if (this.db) {
             await this.db.close();
+            this.db = null;
+            this.initialized = false;
+            this.initPromise = null;
+            console.log('Database connection closed');
         }
+    }
+
+    // Método para verificar se a conexão está ativa
+    isConnected() {
+        return this.initialized && this.db !== null;
+    }
+
+    // Método para garantir que a conexão está ativa
+    async ensureConnection() {
+        if (!this.isConnected()) {
+            await this.init();
+        }
+        return this.db;
     }
 }
 

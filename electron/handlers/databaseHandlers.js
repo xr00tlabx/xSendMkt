@@ -5,7 +5,10 @@ export function setupDatabaseHandlers() {
     // Settings handlers
     ipcMain.handle('db:get-setting', async (event, key) => {
         try {
-            return await Database.getSetting(key);
+            console.log('Handler getSetting chamado para key:', key);
+            const result = await Database.getSetting(key);
+            console.log('Resultado do Database.getSetting:', { key, result });
+            return result;
         } catch (error) {
             console.error('Error getting setting:', error);
             throw error;
@@ -14,7 +17,10 @@ export function setupDatabaseHandlers() {
 
     ipcMain.handle('db:set-setting', async (event, key, value, type = 'string') => {
         try {
-            return await Database.setSetting(key, value, type);
+            console.log('Handler setSetting chamado:', { key, value, type });
+            const result = await Database.setSetting(key, value, type);
+            console.log('Resultado do Database.setSetting:', result);
+            return result;
         } catch (error) {
             console.error('Error setting setting:', error);
             throw error;

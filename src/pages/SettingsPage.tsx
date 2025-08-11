@@ -3,16 +3,16 @@ import React, { useEffect, useState } from 'react';
 
 interface AppSettings {
     listsDirectory: string;
-    apiMode: 'mock' | 'real';
     simultaneousEmails: number;
     emailDelay: number;
     autoSave: boolean;
 }
 
 const SettingsPage: React.FC = () => {
+    console.log('SettingsPage component being created');
+    
     const [settings, setSettings] = useState<AppSettings>({
         listsDirectory: '',
-        apiMode: 'mock',
         simultaneousEmails: 5,
         emailDelay: 1000,
         autoSave: true
@@ -20,36 +20,57 @@ const SettingsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    console.log('SettingsPage state initialized');
+
     // Carregar configurações ao montar o componente
     useEffect(() => {
+        console.log('SettingsPage useEffect executando');
+        alert('SettingsPage carregou! React está funcionando.');
+        
+        console.log('Component mounted');
+        console.log('electronAPI available:', !!window.electronAPI);
+        console.log('electronAPI.files available:', !!window.electronAPI?.files);
+        console.log('electronAPI.database available:', !!window.electronAPI?.database);
+        
+        // Teste de conectividade
+        if (window.electronAPI?.database?.getSetting) {
+            console.log('Testando conectividade com database...');
+            window.electronAPI.database.getSetting('test')
+                .then(result => console.log('Teste conectividade database OK:', result))
+                .catch(err => console.error('Erro no teste de conectividade database:', err));
+        }
+        
+        if (window.electronAPI?.files?.getListsDirectory) {
+            console.log('Testando conectividade com files...');
+            window.electronAPI.files.getListsDirectory()
+                .then(result => console.log('Teste conectividade files OK:', result))
+                .catch(err => console.error('Erro no teste de conectividade files:', err));
+        }
+        
         loadSettings();
-    }, []);
-
-    const loadSettings = async () => {
+    }, []);    const loadSettings = async () => {
         try {
             setLoading(true);
+            console.log('Carregando configurações...');
 
             // Carregar configurações do banco de dados
-            const [
+            const listsDir = await window.electronAPI?.files?.getListsDirectory();
+            const simultaneousEmails = await window.electronAPI?.database?.getSetting('max_concurrent_emails');
+            const emailDelay = await window.electronAPI?.database?.getSetting('delay_between_emails');
+            const autoSave = await window.electronAPI?.database?.getSetting('auto_save_campaigns');
+
+            console.log('Configurações carregadas:', {
                 listsDir,
-                apiMode,
                 simultaneousEmails,
                 emailDelay,
                 autoSave
-            ] = await Promise.all([
-                window.electronAPI?.files?.getListsDirectory() || '',
-                window.electronAPI?.database?.getSetting('api_mode') || 'mock',
-                window.electronAPI?.database?.getSetting('max_concurrent_emails') || '5',
-                window.electronAPI?.database?.getSetting('delay_between_emails') || '1000',
-                window.electronAPI?.database?.getSetting('auto_save_campaigns') || 'true'
-            ]);
+            });
 
             setSettings({
-                listsDirectory: listsDir,
-                apiMode: apiMode === 'real' ? 'real' : 'mock',
-                simultaneousEmails: parseInt(simultaneousEmails, 10),
-                emailDelay: parseInt(emailDelay, 10),
-                autoSave: autoSave === 'true'
+                listsDirectory: listsDir || '',
+                simultaneousEmails: parseInt(simultaneousEmails || '5', 10),
+                emailDelay: parseInt(emailDelay || '1000', 10),
+                autoSave: (autoSave === 'true' || autoSave === true)
             });
         } catch (error) {
             console.error('Erro ao carregar configurações:', error);
@@ -61,7 +82,15 @@ const SettingsPage: React.FC = () => {
     const selectDirectory = async () => {
         try {
             console.log('Tentando selecionar diretório...');
-            const result = await window.electronAPI?.files?.selectListsDirectory();
+            console.log('window.electronAPI disponível:', !!window.electronAPI);
+            console.log('window.electronAPI.files disponível:', !!window.electronAPI?.files);
+            console.log('window.electronAPI.files.selectListsDirectory disponível:', !!window.electronAPI?.files?.selectListsDirectory);
+            
+            if (!window.electronAPI?.files?.selectListsDirectory) {
+                throw new Error('selectListsDirectory não está disponível');
+            }
+            
+            const result = await window.electronAPI.files.selectListsDirectory();
             console.log('Resultado da seleção:', result);
             
             if (result?.success && result.directory) {
@@ -87,16 +116,23 @@ const SettingsPage: React.FC = () => {
             setSaving(true);
             console.log('Salvando configurações:', settings);
 
-            // Salvar todas as configurações no banco de dados
-            const results = await Promise.all([
-                window.electronAPI?.files?.setListsDirectory(settings.listsDirectory),
-                window.electronAPI?.database?.setSetting('api_mode', settings.apiMode),
-                window.electronAPI?.database?.setSetting('max_concurrent_emails', settings.simultaneousEmails.toString(), 'number'),
-                window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number'),
-                window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean')
-            ]);
+            // Salvar diretório das listas
+            if (settings.listsDirectory) {
+                const dirResult = await window.electronAPI?.files?.setListsDirectory(settings.listsDirectory);
+                console.log('Resultado setListsDirectory:', dirResult);
+            }
 
-            console.log('Resultados do salvamento:', results);
+            // Salvar configurações no banco de dados
+            const emailsResult = await window.electronAPI?.database?.setSetting('max_concurrent_emails', settings.simultaneousEmails.toString(), 'number');
+            console.log('Resultado max_concurrent_emails:', emailsResult);
+
+            const delayResult = await window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number');
+            console.log('Resultado delay_between_emails:', delayResult);
+
+            const autoSaveResult = await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
+            console.log('Resultado auto_save_campaigns:', autoSaveResult);
+
+            console.log('Todas as configurações salvas com sucesso');
             alert('Configurações salvas com sucesso!');
         } catch (error) {
             console.error('Erro ao salvar configurações:', error);
@@ -158,20 +194,6 @@ const SettingsPage: React.FC = () => {
                                             Selecionar
                                         </button>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Modo da API
-                                    </label>
-                                    <select
-                                        value={settings.apiMode}
-                                        onChange={(e) => handleInputChange('apiMode', e.target.value as 'mock' | 'real')}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
-                                        <option value="mock">Mock (Desenvolvimento)</option>
-                                        <option value="real">Real (Produção)</option>
-                                    </select>
                                 </div>
                             </div>
                         </div>
