@@ -20,10 +20,10 @@ export function createModalWindow(windowId, options = {}) {
     }
 
     const defaultOptions = {
-        width: 800,
-        height: 600,
-        minWidth: 600,
-        minHeight: 400,
+        width: 700,
+        height: 550,
+        minWidth: 500,
+        minHeight: 350,
         modal: false, // Changed to false to avoid conflicts
         parent: null, // Remove parent to make it independent
         resizable: true,
@@ -31,6 +31,14 @@ export function createModalWindow(windowId, options = {}) {
         minimizable: true,
         autoHideMenuBar: true,
         show: false,
+        titleBarStyle: 'default', // VS Code style title bar
+        titleBarOverlay: {
+            color: '#2d2d30',
+            symbolColor: '#cccccc',
+            height: 30
+        },
+        frame: true,
+        backgroundColor: '#1e1e1e',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,

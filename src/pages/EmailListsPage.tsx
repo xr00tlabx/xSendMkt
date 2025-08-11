@@ -1,6 +1,7 @@
-import { Edit, FileText, Mail, Plus, Settings, Trash2 } from 'lucide-react';
+import { Edit, FileText, Mail, RefreshCw, Settings, Trash2, Upload } from 'lucide-react';
 import React, { useState } from 'react';
 import EmailListModal from '../components/modals/EmailListModal';
+import ImportEmailListModal from '../components/modals/ImportEmailListModal';
 import { useEmailLists, useTxtFileCheck } from '../hooks';
 import type { EmailList } from '../types';
 
@@ -8,6 +9,7 @@ const EmailListsPage: React.FC = () => {
     const { lists, loading, createList, updateList, deleteList } = useEmailLists();
     const { txtFileStatus, loading: checkingFiles, checkTxtFiles } = useTxtFileCheck();
     const [showModal, setShowModal] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
     const [editingList, setEditingList] = useState<EmailList | null>(null);
 
     const handleSaveList = (data: Partial<EmailList>) => {
@@ -17,6 +19,12 @@ const EmailListsPage: React.FC = () => {
             createList({ name: data.name, emails: data.emails });
         }
         setEditingList(null);
+    };
+
+    const handleImportList = (data: { name: string; emails: string[]; chunkSize: number }) => {
+        // Create list with imported emails
+        createList({ name: data.name, emails: data.emails });
+        console.log(`Lista importada com ${data.emails.length} emails, chunking: ${data.chunkSize}`);
     };
 
     const handleEditList = (list: EmailList) => {
@@ -30,23 +38,34 @@ const EmailListsPage: React.FC = () => {
     };
 
     return (
-        <div className="flex-1 p-6 vscode-page">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-xl font-bold" style={{ color: 'var(--vscode-text)' }}>
-                        📧 Email Lists
-                    </h1>
-                    <p className="text-sm mt-1" style={{ color: 'var(--vscode-text-muted)' }}>
-                        Manage your email lists and recipients
-                    </p>
+        <div className="flex-1 vscode-page">
+            <div className="vscode-compact-header">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-[var(--vscode-text)]">
+                            📧 Gerenciar Listas de Email
+                        </h1>
+                        <p className="text-[var(--vscode-text-muted)]">
+                            Importe e gerencie suas listas de emails
+                        </p>
+                    </div>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => setShowImportModal(true)}
+                            className="btn-primary"
+                        >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Importar Lista
+                        </button>
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="btn-secondary"
+                        >
+                            <Mail className="h-4 w-4 mr-2" />
+                            Nova Lista Manual
+                        </button>
+                    </div>
                 </div>
-                <button
-                    onClick={() => setShowModal(true)}
-                    className="btn-primary"
-                >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New List
-                </button>
             </div>
 
             {loading || checkingFiles ? (
@@ -85,14 +104,15 @@ const EmailListsPage: React.FC = () => {
                         <FileText className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--vscode-text-muted)' }} />
                         <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Nenhuma lista encontrada</h3>
                         <p className="mb-6" style={{ color: 'var(--vscode-text-muted)' }}>{txtFileStatus.message}</p>
-                        <div className="space-y-3">
+                                <div className="space-y-2">
                             <button
                                 onClick={checkTxtFiles}
                                 className="btn-primary"
                             >
+                                        <RefreshCw className="h-4 w-4 mr-2" />
                                 Atualizar
                             </button>
-                            <p className="text-sm" style={{ color: 'var(--vscode-text-muted)' }}>
+                                    <p className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
                                 Coloque arquivos .txt no diretório configurado e clique em atualizar
                             </p>
                         </div>
@@ -100,89 +120,98 @@ const EmailListsPage: React.FC = () => {
                 </div>
             ) : lists.length === 0 ? (
                 <div className="vscode-panel">
-                    <div className="text-center py-12">
-                        <Mail className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--vscode-text-muted)' }} />
-                        <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>No email lists yet</h3>
-                        <p className="mb-6" style={{ color: 'var(--vscode-text-muted)' }}>Get started by creating your first email list</p>
-                        <button
-                            onClick={() => setShowModal(true)}
-                            className="btn-primary"
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Email List
-                        </button>
+                                <div className="text-center py-8">
+                                    <Mail className="h-12 w-12 mx-auto mb-3" style={{ color: 'var(--vscode-text-muted)' }} />
+                                    <h3 className="text-base font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Nenhuma lista criada ainda</h3>
+                                    <p className="text-sm mb-4" style={{ color: 'var(--vscode-text-muted)' }}>Comece importando uma lista de emails ou criando uma manualmente</p>
+                                    <div className="flex space-x-2 justify-center">
+                                        <button
+                                            onClick={() => setShowImportModal(true)}
+                                            className="btn-primary"
+                                        >
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            Importar Lista
+                                        </button>
+                                        <button
+                                            onClick={() => setShowModal(true)}
+                                            className="btn-secondary"
+                                        >
+                                            <Mail className="h-4 w-4 mr-2" />
+                                            Criar Manualmente
+                                        </button>
+                                    </div>
                     </div>
                 </div>
             ) : (
                 <div className="vscode-panel">
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y" style={{ borderColor: 'var(--vscode-border)' }}>
-                            <thead style={{ background: 'var(--vscode-surface)' }}>
+                                        <table className="vscode-table min-w-full divide-y">
+                                            <thead>
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vscode-text-muted)' }}>
-                                        Name
+                                                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">
+                                                        Nome
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">
                                         Emails
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vscode-text-muted)' }}>
-                                        Created
+                                                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">
+                                                        Criado
                                     </th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vscode-text-muted)' }}>
-                                        Updated
+                                                    <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider">
+                                                        Atualizado
                                     </th>
-                                    <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--vscode-text-muted)' }}>
-                                        Actions
+                                                    <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider">
+                                                        Ações
                                     </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y" style={{ borderColor: 'var(--vscode-border)' }}>
                                 {lists.map(list => (
                                     <tr key={list.id} className="vscode-item-hover">
-                                        <td className="px-4 py-3">
+                                        <td className="px-3 py-2">
                                             <div className="flex items-center">
                                                 <div>
-                                                    <div className="text-sm font-medium" style={{ color: 'var(--vscode-text)' }}>
+                                                    <div className="text-xs font-medium" style={{ color: 'var(--vscode-text)' }}>
                                                         {list.name}
                                                     </div>
                                                     {list.emails.length > 0 && (
-                                                        <div className="text-xs mt-1 truncate max-w-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                        <div className="text-xs mt-1 truncate max-w-xs opacity-70" style={{ color: 'var(--vscode-text-muted)' }}>
                                                             {list.emails.slice(0, 2).join(', ')}
-                                                            {list.emails.length > 2 && ` +${list.emails.length - 2} more`}
+                                                            {list.emails.length > 2 && ` +${list.emails.length - 2} mais`}
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-3 text-sm">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style={{
+                                        <td className="px-3 py-2 text-xs">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{
                                                 background: 'var(--vscode-accent)25',
                                                 color: 'var(--vscode-accent)'
                                             }}>
-                                                {list.emails.length}
+                                                {list.emails.length.toLocaleString()}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-sm" style={{ color: 'var(--vscode-text-muted)' }}>
-                                            {list.createdAt.toLocaleDateString()}
+                                        <td className="px-3 py-2 text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                            {list.createdAt.toLocaleDateString('pt-BR')}
                                         </td>
-                                        <td className="px-4 py-3 text-sm" style={{ color: 'var(--vscode-text-muted)' }}>
-                                            {list.updatedAt.toLocaleDateString()}
+                                        <td className="px-3 py-2 text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                            {list.updatedAt.toLocaleDateString('pt-BR')}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-sm font-medium">
-                                            <div className="flex justify-end space-x-2">
+                                        <td className="px-3 py-2 text-right text-xs font-medium">
+                                            <div className="flex justify-end space-x-1">
                                                 <button
                                                     onClick={() => handleEditList(list)}
                                                     className="vscode-button-icon"
-                                                    title="Edit list"
+                                                    title="Editar lista"
                                                 >
-                                                    <Edit className="h-4 w-4" />
+                                                    <Edit className="h-3 w-3" />
                                                 </button>
                                                 <button
                                                     onClick={() => deleteList(list.id)}
                                                     className="vscode-button-icon text-red-400 hover:text-red-300"
-                                                    title="Delete list"
+                                                    title="Excluir lista"
                                                 >
-                                                    <Trash2 className="h-4 w-4" />
+                                                    <Trash2 className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </td>
@@ -199,6 +228,12 @@ const EmailListsPage: React.FC = () => {
                 onClose={handleCloseModal}
                 onSave={handleSaveList}
                 editingList={editingList}
+            />
+
+            <ImportEmailListModal
+                isOpen={showImportModal}
+                onClose={() => setShowImportModal(false)}
+                onImport={handleImportList}
             />
         </div>
     );

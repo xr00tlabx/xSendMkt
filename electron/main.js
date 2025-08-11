@@ -65,10 +65,10 @@ function setupIpcHandlers() {
 function createWindow() {
     // Create the browser window
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 1000,
-        minHeight: 700,
+        width: 1200,
+        height: 800,
+        minWidth: 900,
+        minHeight: 600,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -77,9 +77,16 @@ function createWindow() {
             preload: getPreloadPath()
         },
         titleBarStyle: 'default',
+        titleBarOverlay: {
+            color: '#2d2d30',
+            symbolColor: '#cccccc',
+            height: 32
+        },
         icon: path.join(__dirname, '../public/icon.png'), // You'll need to add an icon
         show: false, // Don't show until ready-to-show
-        autoHideMenuBar: false
+        autoHideMenuBar: false,
+        frame: true,
+        backgroundColor: '#1e1e1e'
     });
 
     // Load the app
