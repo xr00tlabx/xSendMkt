@@ -3,6 +3,12 @@ export const apiService = {
     // Email Lists
     getEmailLists: () => window.electronAPI?.files?.getEmailLists() || Promise.resolve([]),
 
+    checkTxtFiles: () => window.electronAPI?.files?.checkTxtFiles() || Promise.resolve({
+        hasDirectory: false,
+        hasTxtFiles: false,
+        message: 'Função não disponível'
+    }),
+
     readEmailList: (filename: string) =>
         window.electronAPI?.files?.readEmails(filename) || Promise.resolve([]),
 

@@ -33,7 +33,6 @@ class Database {
     async _performInit() {
         try {
             const dbPath = path.join(app.getPath('userData'), 'xsendmkt.db');
-            console.log('Database path:', dbPath);
 
             this.db = await open({
                 filename: dbPath,
@@ -43,7 +42,6 @@ class Database {
             await this.createTables();
             this.initialized = true;
             this.initPromise = null; // Limpa a promessa após sucesso
-            console.log('Database initialized successfully');
             return this.db;
         } catch (error) {
             this.initPromise = null; // Limpa a promessa em caso de erro

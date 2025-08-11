@@ -9,8 +9,6 @@ interface AppSettings {
 }
 
 const SettingsPage: React.FC = () => {
-    console.log('SettingsPage component being created');
-    
     const [settings, setSettings] = useState<AppSettings>({
         listsDirectory: '',
         simultaneousEmails: 5,
@@ -20,51 +18,18 @@ const SettingsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    console.log('SettingsPage state initialized');
-
     // Carregar configurações ao montar o componente
     useEffect(() => {
-        console.log('SettingsPage useEffect executando');
-        alert('SettingsPage carregou! React está funcionando.');
-        
-        console.log('Component mounted');
-        console.log('electronAPI available:', !!window.electronAPI);
-        console.log('electronAPI.files available:', !!window.electronAPI?.files);
-        console.log('electronAPI.database available:', !!window.electronAPI?.database);
-        
-        // Teste de conectividade
-        if (window.electronAPI?.database?.getSetting) {
-            console.log('Testando conectividade com database...');
-            window.electronAPI.database.getSetting('test')
-                .then(result => console.log('Teste conectividade database OK:', result))
-                .catch(err => console.error('Erro no teste de conectividade database:', err));
-        }
-        
-        if (window.electronAPI?.files?.getListsDirectory) {
-            console.log('Testando conectividade com files...');
-            window.electronAPI.files.getListsDirectory()
-                .then(result => console.log('Teste conectividade files OK:', result))
-                .catch(err => console.error('Erro no teste de conectividade files:', err));
-        }
-        
         loadSettings();
     }, []);    const loadSettings = async () => {
         try {
             setLoading(true);
-            console.log('Carregando configurações...');
 
             // Carregar configurações do banco de dados
             const listsDir = await window.electronAPI?.files?.getListsDirectory();
             const simultaneousEmails = await window.electronAPI?.database?.getSetting('max_concurrent_emails');
             const emailDelay = await window.electronAPI?.database?.getSetting('delay_between_emails');
             const autoSave = await window.electronAPI?.database?.getSetting('auto_save_campaigns');
-
-            console.log('Configurações carregadas:', {
-                listsDir,
-                simultaneousEmails,
-                emailDelay,
-                autoSave
-            });
 
             setSettings({
                 listsDirectory: listsDir || '',
@@ -73,7 +38,7 @@ const SettingsPage: React.FC = () => {
                 autoSave: (autoSave === 'true' || autoSave === true)
             });
         } catch (error) {
-            console.error('Erro ao carregar configurações:', error);
+            // console.error('Erro ao carregar configurações:', error);
         } finally {
             setLoading(false);
         }
@@ -81,32 +46,24 @@ const SettingsPage: React.FC = () => {
 
     const selectDirectory = async () => {
         try {
-            console.log('Tentando selecionar diretório...');
-            console.log('window.electronAPI disponível:', !!window.electronAPI);
-            console.log('window.electronAPI.files disponível:', !!window.electronAPI?.files);
-            console.log('window.electronAPI.files.selectListsDirectory disponível:', !!window.electronAPI?.files?.selectListsDirectory);
-            
             if (!window.electronAPI?.files?.selectListsDirectory) {
                 throw new Error('selectListsDirectory não está disponível');
             }
             
             const result = await window.electronAPI.files.selectListsDirectory();
-            console.log('Resultado da seleção:', result);
             
             if (result?.success && result.directory) {
-                console.log('Diretório selecionado:', result.directory);
                 setSettings(prev => ({
                     ...prev,
                     listsDirectory: result.directory || ''
                 }));
             } else if (result?.canceled) {
-                console.log('Seleção cancelada pelo usuário');
+                // Seleção cancelada pelo usuário - comportamento normal
             } else {
-                console.log('Falha na seleção:', result);
                 alert('Falha ao selecionar diretório. Verifique os logs do console.');
             }
         } catch (error) {
-            console.error('Erro ao selecionar diretório:', error);
+            // console.error('Erro ao selecionar diretório:', error);
             alert(`Erro ao selecionar diretório: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         }
     };
@@ -114,28 +71,20 @@ const SettingsPage: React.FC = () => {
     const saveSettings = async () => {
         try {
             setSaving(true);
-            console.log('Salvando configurações:', settings);
 
             // Salvar diretório das listas
             if (settings.listsDirectory) {
-                const dirResult = await window.electronAPI?.files?.setListsDirectory(settings.listsDirectory);
-                console.log('Resultado setListsDirectory:', dirResult);
+                await window.electronAPI?.files?.setListsDirectory(settings.listsDirectory);
             }
 
             // Salvar configurações no banco de dados
-            const emailsResult = await window.electronAPI?.database?.setSetting('max_concurrent_emails', settings.simultaneousEmails.toString(), 'number');
-            console.log('Resultado max_concurrent_emails:', emailsResult);
+            await window.electronAPI?.database?.setSetting('max_concurrent_emails', settings.simultaneousEmails.toString(), 'number');
+            await window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number');
+            await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
 
-            const delayResult = await window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number');
-            console.log('Resultado delay_between_emails:', delayResult);
-
-            const autoSaveResult = await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
-            console.log('Resultado auto_save_campaigns:', autoSaveResult);
-
-            console.log('Todas as configurações salvas com sucesso');
             alert('Configurações salvas com sucesso!');
         } catch (error) {
-            console.error('Erro ao salvar configurações:', error);
+            // console.error('Erro ao salvar configurações:', error);
             alert(`Erro ao salvar configurações: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
         } finally {
             setSaving(false);

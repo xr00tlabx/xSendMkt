@@ -10,13 +10,10 @@ class FileService {
     async init() {
         try {
             // Carregar diretório das listas das configurações
-            console.log('Inicializando FileService...');
             const listsDir = await Database.getSetting('lists_directory');
-            console.log('Diretório das listas carregado do banco:', listsDir);
 
             if (listsDir) {
                 this.listsDirectory = listsDir;
-                console.log('Diretório das listas definido:', this.listsDirectory);
             }
         } catch (error) {
             console.error('Erro ao inicializar FileService:', error);
@@ -26,15 +23,11 @@ class FileService {
     // Definir diretório das listas
     async setListsDirectory(directory) {
         try {
-            console.log('Tentando definir diretório:', directory);
-
             // Verificar se o diretório existe
             await fs.access(directory);
-            console.log('Diretório existe e é acessível');
 
             this.listsDirectory = directory;
             const result = await Database.setSetting('lists_directory', directory);
-            console.log('Resultado do setSetting:', result);
 
             return true;
         } catch (error) {
@@ -45,8 +38,43 @@ class FileService {
 
     // Obter diretório das listas
     getListsDirectory() {
-        console.log('Retornando diretório atual:', this.listsDirectory);
         return this.listsDirectory;
+    }
+
+    // Verificar se há arquivos .txt no diretório configurado
+    async checkForTxtFiles() {
+        if (!this.listsDirectory) {
+            return {
+                hasDirectory: false,
+                hasTxtFiles: false,
+                message: 'Diretório de listas não configurado. Vá em Configurações para definir um diretório.'
+            };
+        }
+
+        try {
+            const files = await fs.readdir(this.listsDirectory);
+            const txtFiles = files.filter(file => file.endsWith('.txt'));
+
+            if (txtFiles.length === 0) {
+                return {
+                    hasDirectory: true,
+                    hasTxtFiles: false,
+                    message: `Nenhum arquivo .txt encontrado no diretório: ${this.listsDirectory}`
+                };
+            }
+
+            return {
+                hasDirectory: true,
+                hasTxtFiles: true,
+                message: `${txtFiles.length} arquivo(s) .txt encontrado(s)`
+            };
+        } catch (error) {
+            return {
+                hasDirectory: true,
+                hasTxtFiles: false,
+                message: `Erro ao acessar o diretório: ${this.listsDirectory}`
+            };
+        }
     }
 
     // Listar arquivos de email no diretório

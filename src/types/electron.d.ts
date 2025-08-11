@@ -106,6 +106,12 @@ export interface DomainStats {
     count: number;
 }
 
+export interface TxtFileCheck {
+    hasDirectory: boolean;
+    hasTxtFiles: boolean;
+    message: string;
+}
+
 // API do Electron exposta via contextBridge
 export interface ElectronAPI {
 // App methods
@@ -159,6 +165,7 @@ export interface ElectronAPI {
         selectListsDirectory: () => Promise<FileDialogResult>;
         setListsDirectory: (directory: string) => Promise<{ success: boolean }>;
         getListsDirectory: () => Promise<string>;
+        checkTxtFiles: () => Promise<TxtFileCheck>;
         getEmailLists: () => Promise<EmailList[]>;
         readEmails: (filename: string) => Promise<EmailContact[]>;
         saveEmailList: (filename: string, emails: EmailContact[], format?: string) => Promise<string>;

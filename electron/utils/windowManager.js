@@ -55,7 +55,7 @@ export function createModalWindow(windowId, options = {}) {
         ? `${baseUrl}${separator}t=${timestamp}#${options.route}`
         : `${baseUrl}${separator}t=${timestamp}`;
 
-    console.log(`Creating modal window ${windowId} with URL: ${url}`);
+    // console.log(`Creating modal window ${windowId} with URL: ${url}`);
     modalWindow.loadURL(url);    // Show window when ready
     modalWindow.once('ready-to-show', () => {
         modalWindow.show();

@@ -318,7 +318,7 @@ app.whenReady().then(async () => {
     // Em desenvolvimento, abrir configurações automaticamente para teste
     if (isDev) {
         setTimeout(() => {
-            console.log('Abrindo configurações automaticamente para desenvolvimento...');
+            // console.log('Abrindo configurações automaticamente para desenvolvimento...');
             createSettingsWindow(mainWindow);
         }, 2000);
     }

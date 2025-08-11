@@ -65,3 +65,11 @@ export interface ProxyTestResult {
     responseTime?: number;
     error?: string;
 }
+
+export interface TxtFileCheck {
+    hasDirectory: boolean;
+    hasTxtFiles: boolean;
+    message: string;
+}
+
+export * from './electron';

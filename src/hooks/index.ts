@@ -1,6 +1,37 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '../services';
-import type { EmailCampaign, EmailList, SmtpConfig } from '../types';
+import type { EmailCampaign, EmailList, SmtpConfig, TxtFileCheck } from '../types';
+
+export const useTxtFileCheck = () => {
+    const [txtFileStatus, setTxtFileStatus] = useState<TxtFileCheck>({
+        hasDirectory: false,
+        hasTxtFiles: false,
+        message: 'Verificando...'
+    });
+    const [loading, setLoading] = useState(false);
+
+    const checkTxtFiles = async () => {
+        setLoading(true);
+        try {
+            const result = await apiService.checkTxtFiles();
+            setTxtFileStatus(result);
+        } catch (error) {
+            setTxtFileStatus({
+                hasDirectory: false,
+                hasTxtFiles: false,
+                message: 'Erro ao verificar arquivos de lista'
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        checkTxtFiles();
+    }, []);
+
+    return { txtFileStatus, loading, checkTxtFiles };
+};
 
 export const useEmailLists = () => {
     const [lists, setLists] = useState<EmailList[]>([]);

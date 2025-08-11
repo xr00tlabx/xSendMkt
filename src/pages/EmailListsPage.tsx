@@ -1,11 +1,12 @@
-import { Edit, Mail, Plus, Trash2 } from 'lucide-react';
+import { Edit, FileText, Mail, Plus, Settings, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 import EmailListModal from '../components/modals/EmailListModal';
-import { useEmailLists } from '../hooks';
+import { useEmailLists, useTxtFileCheck } from '../hooks';
 import type { EmailList } from '../types';
 
 const EmailListsPage: React.FC = () => {
     const { lists, loading, createList, updateList, deleteList } = useEmailLists();
+    const { txtFileStatus, loading: checkingFiles, checkTxtFiles } = useTxtFileCheck();
     const [showModal, setShowModal] = useState(false);
     const [editingList, setEditingList] = useState<EmailList | null>(null);
 
@@ -48,7 +49,7 @@ const EmailListsPage: React.FC = () => {
                 </button>
             </div>
 
-            {loading ? (
+            {loading || checkingFiles ? (
                 <div className="vscode-panel">
                     <div className="animate-pulse p-4">
                         <div className="space-y-3">
@@ -60,6 +61,40 @@ const EmailListsPage: React.FC = () => {
                                     <div className="h-4 rounded w-16" style={{ background: 'var(--vscode-surface)' }}></div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            ) : !txtFileStatus.hasDirectory ? (
+                <div className="vscode-panel">
+                    <div className="text-center py-12">
+                        <Settings className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--vscode-text-muted)' }} />
+                        <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Diretório não configurado</h3>
+                        <p className="mb-6" style={{ color: 'var(--vscode-text-muted)' }}>{txtFileStatus.message}</p>
+                        <button
+                            onClick={() => window.location.href = '#/settings'}
+                            className="btn-primary"
+                        >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Ir para Configurações
+                        </button>
+                    </div>
+                </div>
+            ) : !txtFileStatus.hasTxtFiles ? (
+                <div className="vscode-panel">
+                    <div className="text-center py-12">
+                        <FileText className="h-16 w-16 mx-auto mb-4" style={{ color: 'var(--vscode-text-muted)' }} />
+                        <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Nenhuma lista encontrada</h3>
+                        <p className="mb-6" style={{ color: 'var(--vscode-text-muted)' }}>{txtFileStatus.message}</p>
+                        <div className="space-y-3">
+                            <button
+                                onClick={checkTxtFiles}
+                                className="btn-primary"
+                            >
+                                Atualizar
+                            </button>
+                            <p className="text-sm" style={{ color: 'var(--vscode-text-muted)' }}>
+                                Coloque arquivos .txt no diretório configurado e clique em atualizar
+                            </p>
                         </div>
                     </div>
                 </div>
