@@ -1,0 +1,416 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ensure full-height app */
+html,
+body,
+#root {
+    height: 100%;
+}
+
+:root {
+    --vscode-bg: #1e1e1e;
+    --vscode-sidebar: #252526;
+    --vscode-panel: #2d2d30;
+    --vscode-surface: #2d2d30;
+    --vscode-border: #3e3e42;
+    --vscode-text: #cccccc;
+    --vscode-text-muted: #969696;
+    --vscode-accent: #007acc;
+    --vscode-accent-hover: #1177bb;
+    --vscode-success: #4ec9b0;
+    --vscode-warning: #ffcc02;
+    --vscode-error: #f44747;
+    --vscode-button-bg: #0e639c;
+    --vscode-button-hover: #1177bb;
+    --vscode-input-bg: #3c3c3c;
+    --vscode-input-border: #464647;
+    --vscode-shadow: rgba(0, 0, 0, 0.16);
+}
+
+@layer base {
+    * {
+        border-color: var(--vscode-border);
+    }
+
+    body {
+        margin: 0;
+        /* remove default 8px browser margin */
+        @apply font-sans antialiased;
+        background: var(--vscode-bg);
+        color: var(--vscode-text);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+}
+
+@layer components {
+    .vscode-theme {
+        background: var(--vscode-bg);
+        color: var(--vscode-text);
+    }
+
+    .vscode-sidebar {
+        background: var(--vscode-sidebar);
+        border-color: var(--vscode-border);
+    }
+
+    .vscode-panel {
+        background: var(--vscode-panel);
+        border-color: var(--vscode-border);
+    }
+
+    .vscode-surface {
+        background: var(--vscode-surface);
+        border-color: var(--vscode-border);
+        box-shadow: 0 1px 3px var(--vscode-shadow);
+    }
+
+    .btn-primary {
+        background: var(--vscode-button-bg);
+        color: white;
+        @apply font-medium py-1.5 px-3 rounded text-sm transition-all duration-200 shadow-sm;
+            border: 1px solid transparent;
+            min-height: 28px;
+    }
+
+    .btn-primary:hover {
+        background: var(--vscode-button-hover);
+        @apply shadow-md;
+    }
+
+    .btn-primary:disabled {
+        @apply opacity-50 cursor-not-allowed;
+    }
+
+    .btn-secondary {
+        background: transparent;
+        color: var(--vscode-text);
+        border: 1px solid var(--vscode-border);
+        @apply font-medium py-1.5 px-3 rounded text-sm transition-all duration-200;
+            min-height: 28px;
+    }
+
+    .btn-secondary:hover {
+        background: var(--vscode-input-bg);
+        border-color: var(--vscode-accent);
+    }
+
+    .btn-danger {
+        background: var(--vscode-error);
+        color: white;
+        @apply font-medium py-1.5 px-3 rounded text-sm transition-all duration-200 shadow-sm;
+            border: 1px solid transparent;
+            min-height: 28px;
+    }
+
+    .btn-danger:hover {
+        @apply shadow-md opacity-90;
+    }
+
+    .btn-ghost {
+        background: transparent;
+        color: var(--vscode-text-muted);
+        @apply font-medium py-2 px-3 rounded-md transition-all duration-200;
+    }
+
+    .btn-ghost:hover {
+        background: var(--vscode-input-bg);
+        color: var(--vscode-text);
+    }
+
+    .card {
+        background: var(--vscode-surface);
+        border: 1px solid var(--vscode-border);
+        @apply rounded-lg shadow-sm;
+    }
+
+    .input-field {
+        background: var(--vscode-input-bg);
+        border: 1px solid var(--vscode-input-border);
+        color: var(--vscode-text);
+        @apply w-full px-2 py-1.5 rounded text-sm transition-all duration-200;
+            min-height: 28px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    }
+
+    .input-field:focus {
+        outline: none;
+        border-color: var(--vscode-accent);
+        box-shadow: 0 0 0 1px rgba(0, 122, 204, 0.4);
+    }
+
+    .input-field::placeholder {
+        color: var(--vscode-text-muted);
+        font-style: italic;
+        }
+        
+        .textarea-field {
+            background: var(--vscode-input-bg);
+            border: 1px solid var(--vscode-input-border);
+            color: var(--vscode-text);
+            @apply w-full px-2 py-1.5 rounded text-sm transition-all duration-200 resize-none;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            line-height: 1.4;
+        }
+        
+        .textarea-field:focus {
+            outline: none;
+            border-color: var(--vscode-accent);
+            box-shadow: 0 0 0 1px rgba(0, 122, 204, 0.4);
+        }
+        
+        .textarea-field::placeholder {
+            color: var(--vscode-text-muted);
+            font-style: italic;
+        }
+        
+        .vscode-button-icon {
+            background: transparent;
+            color: var(--vscode-text-muted);
+            @apply p-1.5 rounded text-sm transition-all duration-200 hover:bg-opacity-10;
+            border: 1px solid transparent;
+            min-height: 28px;
+            min-width: 28px;
+        }
+        
+        .vscode-button-icon:hover {
+            background: var(--vscode-input-bg);
+            color: var(--vscode-text);
+            border-color: var(--vscode-border);
+        }
+        
+        .vscode-item-hover {
+            transition: background-color 0.15s ease-in-out;
+        }
+        
+        .vscode-item-hover:hover {
+            background: var(--vscode-input-bg);
+        }
+        
+        .vscode-page {
+            padding: 8px;
+            max-height: 100vh;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        .vscode-compact-header {
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--vscode-border);
+        }
+        
+        .vscode-compact-header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            line-height: 1.3;
+        }
+        
+        .vscode-compact-header p {
+            font-size: 11px;
+            margin: 2px 0 0 0;
+            opacity: 0.8;
+        }
+        
+        .vscode-table {
+            background: var(--vscode-surface);
+            font-size: 12px;
+        }
+        
+        .vscode-table th {
+            background: var(--vscode-panel);
+            color: var(--vscode-text-muted);
+            border-bottom: 1px solid var(--vscode-border);
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .vscode-table td {
+            border-bottom: 1px solid var(--vscode-border);
+            padding: 8px;
+            font-size: 12px;
+        }
+        
+        .vscode-modal-compact {
+            padding: 16px;
+            max-width: 600px;
+            font-size: 13px;
+        }
+        
+        .vscode-modal-compact h2 {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .vscode-modal-compact .space-y-3>*+* {
+            margin-top: 12px;
+        }
+        
+        .vscode-modal-compact label {
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: block;
+        }
+        
+        /* Compact input sizing */
+        .input-field-compact {
+            background: var(--vscode-input-bg);
+            border: 1px solid var(--vscode-input-border);
+            color: var(--vscode-text);
+            @apply w-full px-2 py-1 rounded text-xs transition-all duration-200;
+            min-height: 24px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+        }
+        
+        .textarea-field-compact {
+            background: var(--vscode-input-bg);
+            border: 1px solid var(--vscode-input-border);
+            color: var(--vscode-text);
+            @apply w-full px-2 py-1 rounded text-xs transition-all duration-200 resize-none;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            line-height: 1.3;
+        }
+        
+        /* Compact buttons */
+        .btn-compact {
+            @apply font-medium py-1 px-2 rounded text-xs transition-all duration-200;
+            min-height: 24px;
+            border: 1px solid transparent;
+        }
+        
+        .btn-primary-compact {
+            background: var(--vscode-button-bg);
+            color: white;
+            @apply btn-compact shadow-sm;
+        }
+        
+        .btn-primary-compact:hover {
+            background: var(--vscode-button-hover);
+        }
+        
+        .btn-secondary-compact {
+            background: transparent;
+            color: var(--vscode-text);
+            border: 1px solid var(--vscode-border);
+            @apply btn-compact;
+        }
+        
+        .btn-secondary-compact:hover {
+            background: var(--vscode-input-bg);
+            border-color: var(--vscode-accent);
+    }
+
+    .sidebar-item {
+        @apply p-3 rounded-md cursor-pointer transition-all duration-200;
+        color: var(--vscode-text-muted);
+    }
+
+    .sidebar-item:hover {
+        background: var(--vscode-input-bg);
+        color: var(--vscode-text);
+    }
+
+    .sidebar-item.active {
+        background: var(--vscode-accent);
+        color: white;
+        @apply shadow-sm;
+    }
+
+    /* Table styles */
+    .vscode-table {
+        background: var(--vscode-surface);
+    }
+
+    .vscode-table th {
+        background: var(--vscode-panel);
+        color: var(--vscode-text-muted);
+        border-bottom: 1px solid var(--vscode-border);
+    }
+
+    .vscode-table td {
+        border-bottom: 1px solid var(--vscode-border);
+    }
+
+    .vscode-table tr:hover {
+        background: var(--vscode-input-bg);
+    }
+
+    /* Status indicators */
+    .status-draft {
+        @apply bg-gray-500;
+    }
+
+    .status-sending {
+        background: var(--vscode-accent);
+    }
+
+    .status-completed {
+        background: var(--vscode-success);
+    }
+
+    .status-paused {
+        background: var(--vscode-warning);
+    }
+
+    .status-failed {
+        background: var(--vscode-error);
+    }
+
+    /* Monaco editor overrides */
+    .monaco-editor {
+        border: 1px solid var(--vscode-border) !important;
+        @apply rounded-md;
+    }
+
+    /* Scrollbar styling */
+    .vscode-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .vscode-scrollbar::-webkit-scrollbar-track {
+        background: var(--vscode-panel);
+    }
+
+    .vscode-scrollbar::-webkit-scrollbar-thumb {
+        background: var(--vscode-border);
+        border-radius: 4px;
+    }
+
+    .vscode-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: var(--vscode-text-muted);
+    }
+}
+
+button:hover {
+    border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+    outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        color: #213547;
+        background-color: #ffffff;
+    }
+
+    a:hover {
+        color: #747bff;
+    }
+
+    button {
+        background-color: #f9f9f9;
+    }
+}
