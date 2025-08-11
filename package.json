@@ -1,13 +1,24 @@
 {
   "name": "xsendmkt",
+  "productName": "xSendMkt",
+  "description": "Professional Email Marketing Desktop Application",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "homepage": "./",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:55622 && electron .\"",
+    "build:electron": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder --publish=never",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -24,6 +35,9 @@
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.0",
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
@@ -32,6 +46,64 @@
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.0",
-    "vite": "^7.1.0"
+    "vite": "^7.1.0",
+    "wait-on": "^8.0.4"
+  },
+  "build": {
+    "appId": "com.xsendmkt.app",
+    "productName": "xSendMkt",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "public/icon.png",
+        "to": "icon.png"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "public/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
