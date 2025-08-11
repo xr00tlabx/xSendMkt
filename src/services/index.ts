@@ -3,6 +3,22 @@ export const apiService = {
     // Email Lists
     getEmailLists: () => window.electronAPI?.files?.getEmailLists() || Promise.resolve([]),
 
+    createEmailList: (data: Omit<any, 'id' | 'createdAt' | 'updatedAt'>) =>
+        window.electronAPI?.files?.saveEmailList(data.name + '.txt', data.emails, 'txt') || Promise.resolve({
+            id: Date.now().toString(),
+            name: data.name,
+            emails: data.emails,
+            createdAt: new Date(),
+            updatedAt: new Date()
+        }),
+
+    updateEmailList: (id: string, data: Partial<any>) =>
+        window.electronAPI?.files?.saveEmailList(data.name + '.txt', data.emails, 'txt') || Promise.resolve({
+            id,
+            ...data,
+            updatedAt: new Date()
+        }),
+
     checkTxtFiles: () => window.electronAPI?.files?.checkTxtFiles() || Promise.resolve({
         hasDirectory: false,
         hasTxtFiles: false,
@@ -41,6 +57,28 @@ export const apiService = {
 
     getCampaign: (id: number) =>
         window.electronAPI?.database?.getCampaign(id) || Promise.resolve(null),
+
+    createCampaign: (data: any) =>
+        window.electronAPI?.database?.saveCampaign(data) || Promise.resolve(0),
+
+    updateCampaign: (id: number, data: any) =>
+        window.electronAPI?.database?.saveCampaign({ ...data, id }) || Promise.resolve(data),
+
+    sendCampaign: async (id: number) => {
+        const campaign = await window.electronAPI?.database?.getCampaign(id);
+        if (campaign) {
+            return window.electronAPI?.database?.saveCampaign({ ...campaign, status: 'sending' }) || Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+    },
+
+    pauseCampaign: async (id: number) => {
+        const campaign = await window.electronAPI?.database?.getCampaign(id);
+        if (campaign) {
+            return window.electronAPI?.database?.saveCampaign({ ...campaign, status: 'paused' }) || Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+    },
 
     // Email Operations
     testSmtp: (smtpConfig: any) =>

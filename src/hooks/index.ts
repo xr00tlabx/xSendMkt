@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '../services';
 import type { EmailCampaign, EmailList, SmtpConfig, TxtFileCheck } from '../types';
+import type { Campaign } from '../types/electron';
 
 export const useTxtFileCheck = () => {
     const [txtFileStatus, setTxtFileStatus] = useState<TxtFileCheck>({
@@ -43,7 +44,15 @@ export const useEmailLists = () => {
         setError(null);
         try {
             const data = await apiService.getEmailLists();
-            setLists(data);
+            // Convert from electron EmailList[] to app EmailList[]
+            const convertedLists = data.map(list => ({
+                id: list.name, // Use name as ID
+                name: list.name,
+                emails: [], // Will need to load separately if needed
+                createdAt: list.modified,
+                updatedAt: list.modified
+            }));
+            setLists(convertedLists);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch email lists');
         } finally {
@@ -55,7 +64,14 @@ export const useEmailLists = () => {
         setLoading(true);
         setError(null);
         try {
-            const newList = await apiService.createEmailList(data);
+            const newId = await apiService.createEmailList(data);
+            const newList: EmailList = {
+                id: newId,
+                name: data.name,
+                emails: data.emails,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
             setLists(prev => [...prev, newList]);
             return newList;
         } catch (err) {
@@ -70,9 +86,11 @@ export const useEmailLists = () => {
         setLoading(true);
         setError(null);
         try {
-            const updatedList = await apiService.updateEmailList(id, data);
-            setLists(prev => prev.map(list => list.id === id ? updatedList : list));
-            return updatedList;
+            await apiService.updateEmailList(id, data);
+            setLists(prev => prev.map(list => 
+                list.id === id ? { ...list, ...data, updatedAt: new Date() } : list
+            ));
+            return { ...data, id, updatedAt: new Date() } as EmailList;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update email list');
             throw err;
@@ -120,7 +138,18 @@ export const useSmtpConfigs = () => {
         setError(null);
         try {
             const data = await apiService.getSmtpConfigs();
-            setConfigs(data);
+            // Convert from electron SmtpConfig[] to app SmtpConfig[]
+            const convertedConfigs = data.map(config => ({
+                id: config.id?.toString() || '',
+                name: config.name,
+                host: config.host,
+                port: config.port,
+                secure: config.secure,
+                username: config.username,
+                password: config.password,
+                isActive: config.is_active || false
+            }));
+            setConfigs(convertedConfigs);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch SMTP configs');
         } finally {
@@ -132,7 +161,8 @@ export const useSmtpConfigs = () => {
         setLoading(true);
         setError(null);
         try {
-            const newConfig = await apiService.createSmtpConfig(data);
+            const newId = await apiService.createSmtpConfig(data);
+            const newConfig = { ...data, id: newId.toString() };
             setConfigs(prev => [...prev, newConfig]);
             return newConfig;
         } catch (err) {
@@ -147,9 +177,14 @@ export const useSmtpConfigs = () => {
         setLoading(true);
         setError(null);
         try {
-            const updatedConfig = await apiService.updateSmtpConfig(id, data);
-            setConfigs(prev => prev.map(config => config.id === id ? updatedConfig : config));
-            return updatedConfig;
+            const success = await apiService.updateSmtpConfig(parseInt(id), data);
+            if (success) {
+                setConfigs(prev => prev.map(config => 
+                    config.id === id ? { ...config, ...data } : config
+                ));
+                return { ...data, id } as SmtpConfig;
+            }
+            throw new Error('Update failed');
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update SMTP config');
             throw err;
@@ -162,7 +197,7 @@ export const useSmtpConfigs = () => {
         setLoading(true);
         setError(null);
         try {
-            await apiService.deleteSmtpConfig(id);
+            await apiService.deleteSmtpConfig(parseInt(id));
             setConfigs(prev => prev.filter(config => config.id !== id));
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete SMTP config');
@@ -196,8 +231,31 @@ export const useCampaigns = () => {
         setLoading(true);
         setError(null);
         try {
-            const data = await apiService.getCampaigns();
-            setCampaigns(data);
+            const data: Campaign[] = await apiService.getCampaigns();
+            // Convert Campaign[] to EmailCampaign[]
+            const convertedCampaigns: EmailCampaign[] = data.map(campaign => {
+                // Map status from Campaign to EmailCampaign
+                let status: 'draft' | 'sending' | 'paused' | 'completed' | 'failed' = 'draft';
+                if (campaign.status === 'sent') status = 'completed';
+                else if (campaign.status === 'draft' || campaign.status === 'sending' || 
+                         campaign.status === 'paused' || campaign.status === 'failed') {
+                    status = campaign.status;
+                }
+
+                return {
+                    id: campaign.id?.toString() || '',
+                    subject: campaign.subject,
+                    sender: campaign.name, // Use name as sender
+                    htmlContent: campaign.html_content,
+                    selectedLists: [], // Will need to be populated separately
+                    status,
+                    totalEmails: campaign.total_emails || 0,
+                    sentEmails: campaign.sent_emails || 0,
+                    createdAt: campaign.created_at ? new Date(campaign.created_at) : new Date(),
+                    updatedAt: campaign.updated_at ? new Date(campaign.updated_at) : new Date()
+                };
+            });
+            setCampaigns(convertedCampaigns);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch campaigns');
         } finally {
@@ -209,7 +267,20 @@ export const useCampaigns = () => {
         setLoading(true);
         setError(null);
         try {
-            const newCampaign = await apiService.createCampaign(data);
+            // Convert EmailCampaign to Campaign format for API
+            const campaignData: Campaign = {
+                name: data.sender,
+                subject: data.subject,
+                html_content: data.htmlContent,
+                status: data.status === 'completed' ? 'sent' : data.status
+            };
+            const newId = await apiService.createCampaign(campaignData);
+            const newCampaign: EmailCampaign = {
+                ...data,
+                id: newId.toString(),
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
             setCampaigns(prev => [...prev, newCampaign]);
             return newCampaign;
         } catch (err) {
@@ -224,8 +295,20 @@ export const useCampaigns = () => {
         setLoading(true);
         setError(null);
         try {
-            const updatedCampaign = await apiService.updateCampaign(id, data);
-            setCampaigns(prev => prev.map(campaign => campaign.id === id ? updatedCampaign : campaign));
+            // Convert partial EmailCampaign to Campaign format for API
+            const campaignData: Partial<Campaign> = {};
+            if (data.sender) campaignData.name = data.sender;
+            if (data.subject) campaignData.subject = data.subject;
+            if (data.htmlContent) campaignData.html_content = data.htmlContent;
+            if (data.status) {
+                campaignData.status = data.status === 'completed' ? 'sent' : data.status;
+            }
+
+            await apiService.updateCampaign(parseInt(id), campaignData);
+            const updatedCampaign = { ...data, id, updatedAt: new Date() } as EmailCampaign;
+            setCampaigns(prev => prev.map(campaign => 
+                campaign.id === id ? { ...campaign, ...updatedCampaign } : campaign
+            ));
             return updatedCampaign;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to update campaign');
@@ -239,9 +322,11 @@ export const useCampaigns = () => {
         setLoading(true);
         setError(null);
         try {
-            const updatedCampaign = await apiService.sendCampaign(id);
-            setCampaigns(prev => prev.map(campaign => campaign.id === id ? updatedCampaign : campaign));
-            return updatedCampaign;
+            await apiService.sendCampaign(parseInt(id));
+            setCampaigns(prev => prev.map(campaign => 
+                campaign.id === id ? { ...campaign, status: 'sending' as const, updatedAt: new Date() } : campaign
+            ));
+            return null;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to send campaign');
             throw err;
@@ -254,9 +339,11 @@ export const useCampaigns = () => {
         setLoading(true);
         setError(null);
         try {
-            const updatedCampaign = await apiService.pauseCampaign(id);
-            setCampaigns(prev => prev.map(campaign => campaign.id === id ? updatedCampaign : campaign));
-            return updatedCampaign;
+            await apiService.pauseCampaign(parseInt(id));
+            setCampaigns(prev => prev.map(campaign => 
+                campaign.id === id ? { ...campaign, status: 'paused' as const, updatedAt: new Date() } : campaign
+            ));
+            return null;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to pause campaign');
             throw err;

@@ -1,5 +1,5 @@
 import Editor from '@monaco-editor/react';
-import { Loader2, Pause, Play, Save, Send, Settings, Zap } from 'lucide-react';
+import { Loader2, Pause, Save, Send } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import type { EmailCampaign } from '../../types';
 
@@ -160,26 +160,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         campaign.status !== 'sending';
 
     const canPause = campaign?.id && campaign.status === 'sending';
-
-    const getStatusColor = (status?: string) => {
-        switch (status) {
-            case 'sending': return 'var(--vscode-accent)';
-            case 'completed': return 'var(--vscode-success)';
-            case 'paused': return 'var(--vscode-warning)';
-            case 'failed': return 'var(--vscode-error)';
-            default: return 'var(--vscode-text-muted)';
-        }
-    };
-
-    const getStatusIcon = (status?: string) => {
-        switch (status) {
-            case 'sending': return <Play className="h-4 w-4" />;
-            case 'completed': return <Zap className="h-4 w-4" />;
-            case 'paused': return <Pause className="h-4 w-4" />;
-            case 'failed': return <Settings className="h-4 w-4" />;
-            default: return <Save className="h-4 w-4" />;
-        }
-    };
 
     return (
         <div className="w-full h-full flex flex-col min-h-0 min-w-0 overflow-hidden">
