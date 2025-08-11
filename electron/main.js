@@ -8,9 +8,9 @@ import { setupDatabaseHandlers } from './handlers/databaseHandlers.js';
 import { setupEmailHandlers } from './handlers/emailHandlers.js';
 import { setupFileHandlers } from './handlers/fileHandlers.js';
 import { setupWindowHandlers } from './handlers/windowHandlers.js';
+import AutoUpdaterService from './services/autoUpdaterService.js';
 import EmailService from './services/emailService.js';
 import FileService from './services/fileService.js';
-import AutoUpdaterService from './services/autoUpdaterService.js';
 import { getPreloadPath, isDev } from './utils/index.js';
 import {
     closeAllModalWindows,
