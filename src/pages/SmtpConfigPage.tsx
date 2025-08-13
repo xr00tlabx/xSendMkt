@@ -1,13 +1,18 @@
-import { AlertCircle, CheckCircle, Edit, Loader2, Play, Plus, Server, TestTube, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle, Edit, Loader2, Play, Plus, Server, TestTube, Trash2, Upload } from 'lucide-react';
 import React, { useState } from 'react';
 import { useSmtpConfigs } from '../hooks';
 import type { SmtpConfig } from '../types';
+import { LoadSmtpsModal, TestSmtpsModal } from '../components/modals';
 
 const SmtpConfigPage: React.FC = () => {
     const { configs, loading, updateConfig, createConfig, deleteConfig, testConfig, refetch } = useSmtpConfigs();
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [testingAll, setTestingAll] = useState(false);
     const [testingId, setTestingId] = useState<string | null>(null);
+    
+    // Modal states for Load and Test SMTPs
+    const [showLoadSmtpsModal, setShowLoadSmtpsModal] = useState(false);
+    const [showTestSmtpsModal, setShowTestSmtpsModal] = useState(false);
 
     // Bulk add state
     const [bulkText, setBulkText] = useState('');
@@ -133,6 +138,19 @@ const SmtpConfigPage: React.FC = () => {
         }
     };
 
+    const handleLoadSmtps = (newSmtps: SmtpConfig[]) => {
+        // Adicionar SMTPs importados
+        newSmtps.forEach(async (smtp) => {
+            try {
+                await createConfig(smtp);
+            } catch (error) {
+                console.error('Erro ao adicionar SMTP:', error);
+            }
+        });
+        setShowLoadSmtpsModal(false);
+        refetch();
+    };
+
     const handleBulkTestAndSave = async () => {
         if (!bulkPreview || bulkPreview.length === 0) return;
         setBulkProcessing(true);
@@ -247,8 +265,25 @@ const SmtpConfigPage: React.FC = () => {
                     <button className="btn-secondary" onClick={handleExportSmtps} disabled={configs.length === 0} title="Exportar SMTPs">
                         Exportar
                     </button>
+                    <button 
+                        className="btn-secondary" 
+                        onClick={() => setShowLoadSmtpsModal(true)} 
+                        title="Carregar SMTPs de arquivo ou texto"
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Carregar SMTPs
+                    </button>
+                    <button 
+                        className="btn-secondary" 
+                        onClick={() => setShowTestSmtpsModal(true)} 
+                        disabled={configs.length === 0} 
+                        title="Testar SMTPs individualmente"
+                    >
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Testar SMTPs
+                    </button>
                     <button className="btn-secondary" onClick={handleTestAll} disabled={testingAll || configs.length === 0} title="Testar todos os SMTPs">
-                        {testingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
+                        {testingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
                         Testar todos
                     </button>
                     <button className="btn-primary" onClick={handleOpenAdd}>
@@ -549,6 +584,19 @@ const SmtpConfigPage: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* Modais */}
+            <LoadSmtpsModal
+                isOpen={showLoadSmtpsModal}
+                onClose={() => setShowLoadSmtpsModal(false)}
+                onLoad={handleLoadSmtps}
+            />
+
+            <TestSmtpsModal
+                isOpen={showTestSmtpsModal}
+                onClose={() => setShowTestSmtpsModal(false)}
+                smtps={configs}
+            />
         </div>
     );
 };

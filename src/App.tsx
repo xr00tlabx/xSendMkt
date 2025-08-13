@@ -3,11 +3,9 @@ import Layout from './components/layout/Layout';
 import ModalLayout from './components/layout/ModalLayout';
 import EmailListsPage from './pages/EmailListsPage';
 import HomePage from './pages/HomePage';
-import LoadSmtpsPage from './pages/LoadSmtpsPage';
 import SettingsPage from './pages/SettingsPage';
 import SmtpConfigPage from './pages/SmtpConfigPage';
 import StatisticsPage from './pages/StatisticsPage';
-import TestSmtpsPage from './pages/TestSmtpsPage';
 
 function App() {
     // Check immediately if this is a modal window
@@ -49,18 +47,6 @@ function App() {
                         <StatisticsPage />
                     </ModalLayout>
                 );
-            case '/test-smtps':
-                return (
-                    <ModalLayout title="Testar SMTPs">
-                        <TestSmtpsPage />
-                    </ModalLayout>
-                );
-            case '/load-smtps':
-                return (
-                    <ModalLayout title="Carregar SMTPs">
-                        <LoadSmtpsPage />
-                    </ModalLayout>
-                );
             default:
                 return (
                     <ModalLayout title="Erro">
@@ -80,7 +66,6 @@ function App() {
                     <Route path="/smtp-config" element={<SmtpConfigPage />} />
                     <Route path="/statistics" element={<StatisticsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/test-smtps" element={<TestSmtpsPage />} />
                     {/* Legacy routes for compatibility */}
                     <Route path="/lists" element={<EmailListsPage />} />
                     <Route path="/smtp" element={<SmtpConfigPage />} />

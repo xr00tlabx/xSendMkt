@@ -16,11 +16,9 @@ import {
     closeAllModalWindows,
     createCampaignWindow,
     createEmailListsWindow,
-    createLoadSmtpsWindow,
     createSettingsWindow,
     createSmtpManagerWindow,
-    createStatisticsWindow,
-    createTestSmtpsWindow
+    createStatisticsWindow
 } from './utils/windowManager.js';
 
 // ES module compatibility
@@ -260,19 +258,6 @@ function createMenu() {
                     accelerator: 'CmdOrCtrl+M',
                     click: () => {
                         createSmtpManagerWindow(mainWindow);
-                    }
-                },
-                { type: 'separator' },
-                {
-                    label: 'Carregar SMTPs',
-                    click: () => {
-                        createLoadSmtpsWindow(mainWindow);
-                    }
-                },
-                {
-                    label: 'Testar SMTPs',
-                    click: () => {
-                        createTestSmtpsWindow(mainWindow);
                     }
                 },
                 { type: 'separator' },

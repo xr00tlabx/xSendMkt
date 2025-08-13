@@ -3,11 +3,9 @@ import {
     closeModalWindow,
     createCampaignWindow,
     createEmailListsWindow,
-    createLoadSmtpsWindow,
     createSettingsWindow,
     createSmtpManagerWindow,
     createStatisticsWindow,
-    createTestSmtpsWindow,
     getModalWindow
 } from '../utils/windowManager.js';
 
@@ -28,18 +26,6 @@ export function setupWindowHandlers(getMainWindow) {
     ipcMain.handle('window:open-email-lists', () => {
         const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
         return createEmailListsWindow(mainWindow);
-    });
-
-    // Open test SMTPs window
-    ipcMain.handle('window:open-test-smtps', () => {
-        const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
-        return createTestSmtpsWindow(mainWindow);
-    });
-
-    // Open load SMTPs window
-    ipcMain.handle('window:open-load-smtps', () => {
-        const mainWindow = typeof getMainWindow === 'function' ? getMainWindow() : getMainWindow;
-        return createLoadSmtpsWindow(mainWindow);
     });
 
     // Open campaign window

@@ -1,25 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { notifyEmailListsUpdate } from '../../hooks';
-import type { AppSettings, SmtpConfig } from '../../types';
-import { ConfirmModal, LoadSmtpsModal, SettingsModal, TestSmtpsModal } from '../modals';
+import type { AppSettings } from '../../types';
+import { ConfirmModal, SettingsModal } from '../modals';
 
 const Header: React.FC = () => {
     const [showClearListsModal, setShowClearListsModal] = useState(false);
     const [showClearSmtpsModal, setShowClearSmtpsModal] = useState(false);
     const [showSettingsModal, setShowSettingsModal] = useState(false);
-    const [showLoadSmtpsModal, setShowLoadSmtpsModal] = useState(false);
-    const [showTestSmtpsModal, setShowTestSmtpsModal] = useState(false);
-    const [smtps, setSmtps] = useState<SmtpConfig[]>([]);
 
     useEffect(() => {
-        // Load SMTPs from localStorage
-        const loadSmtps = () => {
-            const savedSmtps = localStorage.getItem('smtpConfigs');
-            if (savedSmtps) {
-                setSmtps(JSON.parse(savedSmtps));
-            }
-        };
-
         // Listen to Electron menu events
         const handleMenuEvents = () => {
             // Check if we're in Electron environment
@@ -36,17 +25,6 @@ const Header: React.FC = () => {
                     setShowClearSmtpsModal(true);
                 });
 
-                window.electronAPI.on('menu-load-smtps', () => {
-                    console.log('Menu load smtps triggered');
-                    setShowLoadSmtpsModal(true);
-                });
-
-                window.electronAPI.on('menu-test-smtps', () => {
-                    console.log('Menu test smtps triggered');
-                    loadSmtps();
-                    setShowTestSmtpsModal(true);
-                });
-
                 window.electronAPI.on('menu-open-settings', () => {
                     console.log('Menu settings triggered');
                     setShowSettingsModal(true);
@@ -57,7 +35,6 @@ const Header: React.FC = () => {
             }
         };
 
-        loadSmtps();
         handleMenuEvents();
 
         // Cleanup listeners on unmount
@@ -65,8 +42,6 @@ const Header: React.FC = () => {
             if (typeof window !== 'undefined' && window.electronAPI) {
                 window.electronAPI.removeAllListeners('menu-clear-lists');
                 window.electronAPI.removeAllListeners('menu-clear-smtps');
-                window.electronAPI.removeAllListeners('menu-load-smtps');
-                window.electronAPI.removeAllListeners('menu-test-smtps');
                 window.electronAPI.removeAllListeners('menu-open-settings');
             }
         };
@@ -98,16 +73,7 @@ const Header: React.FC = () => {
 
     const handleClearSmtps = () => {
         localStorage.removeItem('smtpConfigs');
-        setSmtps([]);
         setShowClearSmtpsModal(false);
-        window.location.reload();
-    };
-
-    const handleLoadSmtps = (newSmtps: SmtpConfig[]) => {
-        const existingSmtps = JSON.parse(localStorage.getItem('smtpConfigs') || '[]');
-        const allSmtps = [...existingSmtps, ...newSmtps];
-        localStorage.setItem('smtpConfigs', JSON.stringify(allSmtps));
-        setSmtps(allSmtps);
         window.location.reload();
     };
 
@@ -149,18 +115,6 @@ const Header: React.FC = () => {
                 isOpen={showSettingsModal}
                 onClose={() => setShowSettingsModal(false)}
                 onSave={handleSaveSettings}
-            />
-
-            <LoadSmtpsModal
-                isOpen={showLoadSmtpsModal}
-                onClose={() => setShowLoadSmtpsModal(false)}
-                onLoad={handleLoadSmtps}
-            />
-
-            <TestSmtpsModal
-                isOpen={showTestSmtpsModal}
-                onClose={() => setShowTestSmtpsModal(false)}
-                smtps={smtps}
             />
         </>
     );

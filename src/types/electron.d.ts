@@ -190,8 +190,6 @@ export interface ElectronAPI {
         openSettings: () => Promise<any>;
         openSmtpManager: () => Promise<any>;
         openEmailLists: () => Promise<any>;
-        openTestSmtps: () => Promise<any>;
-        openLoadSmtps: () => Promise<any>;
         openCampaign: (campaignId?: number) => Promise<any>;
         openStatistics: () => Promise<any>;
         closeModal: (windowId: string) => Promise<boolean>;
@@ -202,8 +200,6 @@ export interface ElectronAPI {
     onMenuSaveCampaign: (callback: () => void) => void;
     onMenuClearLists: (callback: () => void) => void;
     onMenuClearSmtps: (callback: () => void) => void;
-    onMenuLoadSmtps: (callback: () => void) => void;
-    onMenuTestSmtps: (callback: () => void) => void;
     onMenuOpenSettings: (callback: () => void) => void;
 
     // Window event listeners

@@ -149,21 +149,3 @@ export function createCampaignWindow(parent, campaignId = null) {
         route
     });
 }
-
-export function createTestSmtpsWindow(parent) {
-    return createModalWindow('test-smtps', {
-        title: 'Testar SMTPs - xSendMkt',
-        width: 800,
-        height: 600,
-        route: '/test-smtps'
-    });
-}
-
-export function createLoadSmtpsWindow(parent) {
-    return createModalWindow('load-smtps', {
-        title: 'Carregar SMTPs - xSendMkt',
-        width: 700,
-        height: 500,
-        route: '/load-smtps'
-    });
-}

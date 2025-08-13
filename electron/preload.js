@@ -72,8 +72,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         openSettings: () => ipcRenderer.invoke('window:open-settings'),
         openSmtpManager: () => ipcRenderer.invoke('window:open-smtp-manager'),
         openEmailLists: () => ipcRenderer.invoke('window:open-email-lists'),
-        openTestSmtps: () => ipcRenderer.invoke('window:open-test-smtps'),
-        openLoadSmtps: () => ipcRenderer.invoke('window:open-load-smtps'),
         openCampaign: (campaignId) => ipcRenderer.invoke('window:open-campaign', campaignId),
         openStatistics: () => ipcRenderer.invoke('window:open-statistics'),
         closeModal: (windowId) => ipcRenderer.invoke('window:close-modal', windowId),
@@ -86,8 +84,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMenuSaveCampaign: (callback) => ipcRenderer.on('menu-save-campaign', callback),
     onMenuClearLists: (callback) => ipcRenderer.on('menu-clear-lists', callback),
     onMenuClearSmtps: (callback) => ipcRenderer.on('menu-clear-smtps', callback),
-    onMenuLoadSmtps: (callback) => ipcRenderer.on('menu-load-smtps', callback),
-    onMenuTestSmtps: (callback) => ipcRenderer.on('menu-test-smtps', callback),
     onMenuOpenSettings: (callback) => ipcRenderer.on('menu-open-settings', callback),
 
     // Window event listeners
