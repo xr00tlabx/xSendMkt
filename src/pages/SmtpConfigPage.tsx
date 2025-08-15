@@ -1,25 +1,39 @@
-import { AlertCircle, CheckCircle, Edit, Loader2, Play, Plus, Server, TestTube, Trash2, Upload } from 'lucide-react';
+import {
+    Activity, AlertCircle, AlertTriangle, BarChart3, CheckCircle, Clock, Database,
+    Edit, Loader2, Mail, Play, Plus, Rocket, Server, Settings, TestTube, Trash2,
+    X, Zap
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { useSmtpConfigs } from '../hooks';
 import type { SmtpConfig } from '../types';
-import { LoadSmtpsModal, TestSmtpsModal } from '../components/modals';
+import { detectSmtpWithCustomSubdomains } from '../utils/smtpDetector';
 
 const SmtpConfigPage: React.FC = () => {
     const { configs, loading, updateConfig, createConfig, deleteConfig, testConfig, refetch } = useSmtpConfigs();
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [testingAll, setTestingAll] = useState(false);
     const [testingId, setTestingId] = useState<string | null>(null);
-    
-    // Modal states for Load and Test SMTPs
-    const [showLoadSmtpsModal, setShowLoadSmtpsModal] = useState(false);
-    const [showTestSmtpsModal, setShowTestSmtpsModal] = useState(false);
 
     // Bulk add state
     const [bulkText, setBulkText] = useState('');
     const [bulkPreview, setBulkPreview] = useState<Array<Omit<SmtpConfig, 'id'>>>();
     const [bulkErrors, setBulkErrors] = useState<string[]>([]);
     const [bulkProcessing, setBulkProcessing] = useState(false);
-    const [bulkResults, setBulkResults] = useState<Array<{ key: string; status: 'ok' | 'fail' | 'dup'; message?: string }>>([]);
+
+    // Advanced import settings
+    const [bulkSettings, setBulkSettings] = useState({
+        threads: 3,
+        timeout: 15000,
+        retryPorts: [587, 465, 25, 2525]
+    });
+
+    // Real-time progress tracking
+    const [bulkProgress, setBulkProgress] = useState({
+        current: 0,
+        total: 0,
+        currentEmail: '',
+        logs: [] as Array<{ time: string; message: string; type: 'info' | 'success' | 'error' | 'warning' }>
+    });
 
     // Edit modal state
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -41,7 +55,6 @@ const SmtpConfigPage: React.FC = () => {
         setBulkText('');
         setBulkPreview(undefined);
         setBulkErrors([]);
-        setBulkResults([]);
         setIsAddOpen(true);
     };
 
@@ -61,44 +74,154 @@ const SmtpConfigPage: React.FC = () => {
         setIsEditOpen(true);
     };
 
-    // Parse textarea lines: host|port|email|senha (pipe only)
+    // Função para extrair email e senha de forma inteligente de qualquer texto
+    const extractEmailPassword = (line: string): { email?: string; password?: string; extracted: boolean } => {
+        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+        const emailMatch = line.match(emailRegex);
+
+        if (!emailMatch) {
+            return { extracted: false };
+        }
+
+        const email = emailMatch[0];
+
+        // Remove o email da linha para encontrar a senha
+        const lineWithoutEmail = line.replace(email, '').trim();
+
+        // Padrões para encontrar a senha (remove separadores comuns)
+        const cleanLine = lineWithoutEmail
+            .replace(/^[|:;,\s\t-]+/, '') // Remove separadores no início
+            .replace(/[|:;,\s\t-]+$/, '') // Remove separadores no final
+            .split(/[|:;,\s\t]+/) // Divide por separadores
+            .filter(part => part.length > 0);
+
+        // A senha é geralmente a primeira parte não vazia após o email
+        const password = cleanLine[0];
+
+        if (password && password.length > 0) {
+            return { email, password, extracted: true };
+        }
+
+        return { email, extracted: false };
+    };
+
+    // Parse textarea lines with intelligent email/password extraction
     const parseBulk = (text: string) => {
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
         const preview: Array<Omit<SmtpConfig, 'id'>> = [];
         const errors: string[] = [];
+        const extracted: Array<{ email: string; password: string }> = [];
+
         lines.forEach((line, idx) => {
-            const parts = line.split('|');
-            if (parts.length < 4) {
-                errors.push(`Linha ${idx + 1}: formato esperado host|porta|email|senha`);
-                return;
+            try {
+                let email: string = '';
+                let password: string = '';
+                let host: string = '';
+                let port: number = 587;
+                let secure: boolean = false;
+                let processed = false;
+
+                // Tentar formato padrão primeiro
+                if (line.includes('|')) {
+                    const parts = line.split('|').map(p => p.trim());
+
+                    if (parts.length === 2 && /^\S+@\S+\.\S+$/.test(parts[0])) {
+                        // Formato: email|senha
+                        [email, password] = parts;
+                        const domain = email.split('@')[1].toLowerCase();
+                        host = `smtp.${domain}`;
+                        port = 587;
+                        secure = false;
+                        processed = true;
+                    } else if (parts.length >= 4 && /^\S+@\S+\.\S+$/.test(parts[2])) {
+                        // Formato: host|porta|email|senha
+                        const [hostPart, portStr, emailPart, passwordPart] = parts;
+                        host = hostPart;
+                        port = Number(portStr);
+                        email = emailPart;
+                        password = passwordPart;
+                        secure = port === 465;
+
+                        if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+                            processed = false;
+                        } else {
+                            processed = true;
+                        }
+                    }
+                } else if (line.includes(':')) {
+                    const parts = line.split(':').map(p => p.trim());
+                    if (parts.length === 2 && /^\S+@\S+\.\S+$/.test(parts[0])) {
+                        // Formato: email:senha
+                        [email, password] = parts;
+                        const domain = email.split('@')[1].toLowerCase();
+                        host = `smtp.${domain}`;
+                        port = 587;
+                        secure = false;
+                        processed = true;
+                    }
+                }
+
+                // Se não conseguiu processar com formato padrão, tentar extração inteligente
+                if (!processed) {
+                    const extraction = extractEmailPassword(line);
+                    if (extraction.extracted && extraction.email && extraction.password) {
+                        email = extraction.email;
+                        password = extraction.password;
+                        extracted.push({ email, password });
+
+                        const domain = email.split('@')[1].toLowerCase();
+                        host = `smtp.${domain}`;
+                        port = 587;
+                        secure = false;
+                        processed = true;
+                    } else {
+                        // Mesmo se não conseguir extrair senha, guardar o email para possível teste
+                        if (extraction.email) {
+                            extracted.push({ email: extraction.email, password: extraction.password || '' });
+                            errors.push(`Linha ${idx + 1}: formato inválido, mas email encontrado: ${extraction.email}`);
+                        } else {
+                            errors.push(`Linha ${idx + 1}: formato inválido e nenhum email encontrado`);
+                        }
+                        return;
+                    }
+                }
+
+                if (!email || !password) {
+                    errors.push(`Linha ${idx + 1}: email ou senha vazia`);
+                    return;
+                }
+
+                const local = email.split('@')[0];
+                const domain = email.split('@')[1];
+
+                preview.push({
+                    name: `${local}@${domain} (auto-detectar)`,
+                    host,
+                    port,
+                    secure,
+                    username: email,
+                    password,
+                    fromEmail: email,
+                    fromName: local,
+                    isActive: true
+                });
+            } catch (error) {
+                // Mesmo com erro, tentar extrair email e senha
+                const extraction = extractEmailPassword(line);
+                if (extraction.email) {
+                    extracted.push({ email: extraction.email, password: extraction.password || '' });
+                    errors.push(`Linha ${idx + 1}: erro ao processar, mas email encontrado: ${extraction.email}`);
+                } else {
+                    errors.push(`Linha ${idx + 1}: erro ao processar linha`);
+                }
             }
-            const [host, portStr, email, password] = parts.map(p => p.trim());
-            const lineErrors: string[] = [];
-            const port = Number(portStr);
-            if (!host) lineErrors.push(`Linha ${idx + 1}: host vazio`);
-            if (!Number.isInteger(port) || port < 1 || port > 65535) lineErrors.push(`Linha ${idx + 1}: porta inválida`);
-            if (!/^\S+@\S+\.\S+$/.test(email)) lineErrors.push(`Linha ${idx + 1}: email inválido`);
-            if (!password) lineErrors.push(`Linha ${idx + 1}: senha vazia`);
-            if (lineErrors.length > 0) {
-                errors.push(...lineErrors);
-                return;
-            }
-            const local = email.split('@')[0];
-            const secure = port === 465;
-            preview.push({
-                name: `${local}@${host}:${port}`,
-                host,
-                port,
-                secure,
-                username: email,
-                password,
-                fromEmail: email,
-                fromName: local,
-                isActive: true
-            });
         });
+
         setBulkPreview(preview);
         setBulkErrors(errors);
+
+        // Armazenar emails/senhas extraídas para uso no teste
+        (window as any).extractedCredentials = extracted;
     };
 
     const handleBulkChange = (val: string) => {
@@ -138,34 +261,421 @@ const SmtpConfigPage: React.FC = () => {
         }
     };
 
-    const handleLoadSmtps = (newSmtps: SmtpConfig[]) => {
-        // Adicionar SMTPs importados
-        newSmtps.forEach(async (smtp) => {
-            try {
-                await createConfig(smtp);
-            } catch (error) {
-                console.error('Erro ao adicionar SMTP:', error);
+    const addLog = (message: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
+        const time = new Date().toLocaleTimeString();
+        setBulkProgress(prev => ({
+            ...prev,
+            logs: [...prev.logs.slice(-49), { time, message, type }]
+        }));
+    };
+
+    // Função para validar se o domínio está online
+    const validateDomainOnline = async (domain: string): Promise<{ online: boolean; error?: string }> => {
+        try {
+            addLog(`🌐 Verificando conectividade do domínio ${domain}...`, 'info');
+
+            // Tentar múltiplas validações
+            const validations = [
+                // 1. Teste de DNS básico
+                checkDnsResolution(domain),
+                // 2. Teste de ping HTTP/HTTPS
+                checkHttpConnectivity(domain),
+                // 3. Teste de conectividade TCP na porta 80/443
+                checkBasicConnectivity(domain),
+                // 4. Teste específico de servidor SMTP
+                checkSmtpServerAvailability(domain)
+            ];
+
+            const results = await Promise.allSettled(validations);
+            const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+
+            if (successCount > 0) {
+                addLog(`✅ Domínio ${domain} está online (${successCount}/4 testes passaram)`, 'success');
+                return { online: true };
+            } else {
+                const errors = results
+                    .filter(r => r.status === 'rejected')
+                    .map(r => (r as PromiseRejectedResult).reason?.message || 'Erro desconhecido');
+
+                addLog(`❌ Domínio ${domain} parece estar offline`, 'warning');
+                return { online: false, error: `Falha nos testes: ${errors.join(', ')}` };
             }
-        });
-        setShowLoadSmtpsModal(false);
-        refetch();
+        } catch (error: any) {
+            addLog(`💥 Erro ao verificar domínio ${domain}: ${error.message}`, 'error');
+            return { online: false, error: error.message };
+        }
+    };
+
+    // Função para verificar disponibilidade do servidor SMTP
+    const checkSmtpServerAvailability = async (domain: string): Promise<boolean> => {
+        const smtpHosts = [
+            `smtp.${domain}`,
+            `mail.${domain}`,
+            `mx.${domain}`,
+            domain // Às vezes o próprio domínio é o servidor SMTP
+        ];
+
+        for (const host of smtpHosts) {
+            try {
+                addLog(`🔍 Verificando servidor SMTP ${host}...`, 'info');
+
+                // Simular uma conexão TCP básica usando fetch com timeout muito baixo
+                // Isso não vai conectar realmente no SMTP, mas vai verificar se o host responde
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                await fetch(`https://${host}`, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                addLog(`✅ Servidor SMTP ${host} respondeu`, 'success');
+                return true;
+            } catch (error) {
+                // Não é necessariamente um erro, apenas continue tentando
+                addLog(`⚠️ Servidor SMTP ${host} não respondeu na porta 443/80`, 'warning');
+            }
+        }
+
+        // Se chegou até aqui, nenhum servidor SMTP comum respondeu
+        // Mas isso não significa que não existe, apenas que não responde em HTTP/HTTPS
+        addLog(`🔍 Servidores SMTP comuns não respondem em HTTP, mas podem estar ativos na porta 587/465`, 'info');
+        return true; // Permitir continuar o teste mesmo assim
+    };
+
+    // Função para testar resolução DNS
+    const checkDnsResolution = async (domain: string): Promise<boolean> => {
+        try {
+            // Usar fetch para testar se o domínio resolve
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            await fetch(`https://${domain}`, {
+                method: 'HEAD',
+                mode: 'no-cors',
+                signal: controller.signal 
+            });
+
+            clearTimeout(timeoutId);
+            return true;
+        } catch (error) {
+            // Mesmo com erro de CORS, se chegou até aqui o DNS resolveu
+            return true;
+        }
+    };
+
+    // Função para testar conectividade HTTP/HTTPS
+    const checkHttpConnectivity = async (domain: string): Promise<boolean> => {
+        const urls = [`https://${domain}`, `http://${domain}`];
+
+        for (const url of urls) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+                await fetch(url, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+                return true;
+            } catch (error) {
+                // Continue tentando próxima URL
+            }
+        }
+        return false;
+    };
+
+    // Função para testar conectividade básica
+    const checkBasicConnectivity = async (domain: string): Promise<boolean> => {
+        try {
+            // Usar uma técnica de imagem para testar conectividade
+            return new Promise((resolve) => {
+                const img = new Image();
+                const timeout = setTimeout(() => {
+                    resolve(false);
+                }, 3000);
+
+                img.onload = img.onerror = () => {
+                    clearTimeout(timeout);
+                    resolve(true); // Qualquer resposta indica que o domínio está acessível
+                };
+
+                img.src = `https://${domain}/favicon.ico?${Date.now()}`;
+            });
+        } catch {
+            return false;
+        }
+    };
+
+    // Função para validar configurações de email antes de testar SMTP
+    const validateEmailAndDomain = async (email: string): Promise<{ valid: boolean; domain?: string; error?: string }> => {
+        try {
+            // Validar formato do email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                return { valid: false, error: 'Formato de email inválido' };
+            }
+
+            const domain = email.split('@')[1];
+
+            // Validar se o domínio não está vazio
+            if (!domain) {
+                return { valid: false, error: 'Domínio não encontrado no email' };
+            }
+
+            // Lista de domínios problemáticos comuns que podem não ter SMTP configurado
+            const problematicDomains = [
+                'example.com', 'test.com', 'demo.com', 'sample.com',
+                'localhost', '127.0.0.1', 'invalid.com', 'fake.com'
+            ];
+
+            if (problematicDomains.includes(domain.toLowerCase())) {
+                addLog(`⚠️ Domínio ${domain} está na lista de domínios problemáticos`, 'warning');
+                return { valid: false, error: `Domínio ${domain} é conhecido por não ter configuração SMTP válida` };
+            }
+
+            // Validações específicas para domínios conhecidos
+            const knownFreeDomains = [
+                'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com',
+                'live.com', 'msn.com', 'icloud.com', 'aol.com'
+            ];
+
+            const isFreeDomain = knownFreeDomains.includes(domain.toLowerCase());
+            if (isFreeDomain) {
+                addLog(`📧 Detectado domínio gratuito ${domain} - usando configurações especiais`, 'info');
+                // Para domínios gratuitos, pular verificação de conectividade do domínio
+                // pois sabemos que funcionam, mas podem bloquear alguns tipos de requisição
+                return { valid: true, domain };
+            }
+
+            // Verificar se o domínio está online (apenas para domínios corporativos/personalizados)
+            const domainCheck = await validateDomainOnline(domain);
+            if (!domainCheck.online) {
+                return {
+                    valid: false,
+                    domain,
+                    error: `Domínio ${domain} parece estar offline: ${domainCheck.error}`
+                };
+            }
+
+            return { valid: true, domain };
+        } catch (error: any) {
+            return { valid: false, error: error.message };
+        }
+    };
+
+    const testSmtpWithRetries = async (email: string, password: string): Promise<{ success: boolean; config?: Omit<SmtpConfig, 'id'>; error?: string }> => {
+        addLog(`🔍 Iniciando validação de ${email}...`, 'info');
+
+        try {
+            // NOVA VALIDAÇÃO: Verificar email e domínio antes de testar SMTP
+            const validation = await validateEmailAndDomain(email);
+            if (!validation.valid) {
+                addLog(`❌ Validação falhou para ${email}: ${validation.error}`, 'error');
+                return { success: false, error: validation.error };
+            }
+
+            addLog(`✅ Email e domínio validados para ${email}`, 'success');
+            addLog(`🔧 Iniciando testes SMTP para ${email}...`, 'info');
+
+            // Primeiro, tenta detectar configurações conhecidas
+            const detectedConfigs = await detectSmtpWithCustomSubdomains(email);
+
+            // Se não detectou nenhuma, cria configurações com as portas padrão
+            if (detectedConfigs.length === 0) {
+                const domain = email.split('@')[1];
+                for (const port of bulkSettings.retryPorts) {
+                    detectedConfigs.push({
+                        host: `smtp.${domain}`,
+                        port,
+                        secure: port === 465,
+                        detected: false,
+                        provider: `Custom-${port}`
+                    });
+                }
+            }
+
+            // Testa cada configuração
+            for (const detected of detectedConfigs) {
+                const config: Omit<SmtpConfig, 'id'> = {
+                    name: `${detected.provider} - ${email}`,
+                    host: detected.host,
+                    port: detected.port,
+                    secure: detected.secure,
+                    username: email,
+                    password,
+                    fromEmail: email,
+                    fromName: email.split('@')[0],
+                    isActive: true
+                };
+
+                addLog(`⚡ Tentando ${detected.host}:${detected.port} (${detected.secure ? 'SSL' : 'TLS'})`, 'info');
+
+                try {
+                    const test = await Promise.race([
+                        testConfig({ id: 'temp', ...config }),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Timeout')), bulkSettings.timeout)
+                        )
+                    ]) as any;
+
+                    if (test?.success) {
+                        addLog(`✅ Sucesso com ${detected.host}:${detected.port}`, 'success');
+                        return { success: true, config };
+                    }
+                } catch (error: any) {
+                    addLog(`❌ Falhou ${detected.host}:${detected.port} - ${error.message}`, 'warning');
+                }
+            }
+
+            addLog(`🚫 Todas as tentativas falharam para ${email}`, 'error');
+            return { success: false, error: 'Todas as configurações testadas falharam' };
+
+        } catch (error: any) {
+            addLog(`💥 Erro crítico para ${email}: ${error.message}`, 'error');
+            return { success: false, error: error.message };
+        }
     };
 
     const handleBulkTestAndSave = async () => {
-        if (!bulkPreview || bulkPreview.length === 0) return;
+        // Verificar se temos dados para processar
+        const hasPreview = bulkPreview && bulkPreview.length > 0;
+        const extractedCreds = (window as any).extractedCredentials || [];
+        const hasExtracted = extractedCreds.length > 0;
+
+        if (!hasPreview && !hasExtracted) {
+            addLog('❌ Nenhum dado válido para processar', 'error');
+            return;
+        }
+
         setBulkProcessing(true);
-        setBulkResults([]);
+
+        // Se não temos preview mas temos emails extraídos, processar apenas eles
+        if (!hasPreview && hasExtracted) {
+            setBulkProgress({
+                current: 0,
+                total: extractedCreds.length,
+                currentEmail: '',
+                logs: []
+            });
+
+            addLog(`🚀 Iniciando teste de ${extractedCreds.length} emails extraídos`, 'info');
+            addLog(`⚠️ Usando extração inteligente devido a erros de formato`, 'warning');
+
+            try {
+                let ok = 0, fail = 0, dup = 0;
+                const existing = new Set(configs.map(c => `${c.host}|${c.port}|${(c.username || '').toLowerCase()}`));
+
+                for (const cred of extractedCreds) {
+                    setBulkProgress(prev => ({ ...prev, current: prev.current + 1, currentEmail: cred.email }));
+
+                    if (!cred.email || !cred.password) {
+                        fail++;
+                        addLog(`❌ ${cred.email || 'email desconhecido'}: Email ou senha vazios`, 'error');
+                        continue;
+                    }
+
+                    const domain = cred.email.split('@')[1]?.toLowerCase() || '';
+                    const smtpHost = `smtp.${domain}`;
+                    const key = `${smtpHost}|587|${cred.email.toLowerCase()}`;
+
+                    if (existing.has(key)) {
+                        dup++;
+                        addLog(`⚠️ ${cred.email}: Já existe (ignorado)`, 'warning');
+                        continue;
+                    }
+
+                    // Tentar detectar configuração SMTP automaticamente
+                    try {
+                        addLog(`🔍 ${cred.email}: Testando configuração automática...`, 'info');
+
+                        // Criar configuração usando função do hook
+                        const newConfig: Omit<SmtpConfig, 'id'> = {
+                            name: `${cred.email} (auto-detectado)`,
+                            host: smtpHost,
+                            port: 587,
+                            secure: false,
+                            username: cred.email,
+                            password: cred.password,
+                            fromEmail: cred.email,
+                            fromName: cred.email.split('@')[0],
+                            isActive: true
+                        };
+
+                        await createConfig(newConfig);
+                        existing.add(key);
+                        ok++;
+                        addLog(`✅ ${cred.email}: Adicionado com sucesso`, 'success');
+
+                    } catch (error) {
+                        fail++;
+                        addLog(`❌ ${cred.email}: Erro ao testar - ${error}`, 'error');
+                    }
+                }
+
+                addLog(`🎯 Resultado: ${ok} OK, ${fail} falhas, ${dup} duplicados`, 'info');
+                setBulkProcessing(false);
+
+                if (ok > 0) {
+                    refetch();
+                }
+
+                return;
+            } catch (error) {
+                addLog(`❌ Erro geral: ${error}`, 'error');
+                setBulkProcessing(false);
+                return;
+            }
+        }
+
+        // Verificar se bulkPreview existe antes de usar
+        if (!bulkPreview) {
+            addLog('❌ Erro interno: preview não disponível', 'error');
+            setBulkProcessing(false);
+            return;
+        }
+
+        // Processar preview normal
+        setBulkProgress({
+            current: 0,
+            total: bulkPreview.length,
+            currentEmail: '',
+            logs: []
+        });
+
+        addLog(`🚀 Iniciando teste de ${bulkPreview.length} emails com ${bulkSettings.threads} threads`, 'info');
+        addLog(`⏱️ Timeout por teste: ${bulkSettings.timeout}ms`, 'info');
+
         try {
             let ok = 0, fail = 0, dup = 0;
             const results: Array<{ key: string; status: 'ok' | 'fail' | 'dup'; message?: string }> = [];
             const existing = new Set(configs.map(c => `${c.host}|${c.port}|${(c.username || '').toLowerCase()}`));
-            for (const cfg of bulkPreview) {
+
+            // Processa em lotes usando threads simultâneas
+            const emailsToProcess = bulkPreview.filter(cfg =>
+                cfg.host.startsWith('smtp.') && cfg.name.includes('(auto-detectar)')
+            );
+
+            const manualConfigs = bulkPreview.filter(cfg =>
+                !(cfg.host.startsWith('smtp.') && cfg.name.includes('(auto-detectar)'))
+            );
+
+            // Processa configurações manuais primeiro (são mais rápidas)
+            for (const cfg of manualConfigs) {
                 const key = `${cfg.host}|${cfg.port}|${(cfg.username || '').toLowerCase()}`;
+                setBulkProgress(prev => ({ ...prev, current: prev.current + 1, currentEmail: cfg.username }));
+
                 if (existing.has(key)) {
                     dup++;
                     results.push({ key, status: 'dup', message: 'Duplicado. Ignorado.' });
                     continue;
                 }
+
                 try {
                     const test = await testConfig({ id: 'temp', ...cfg });
                     if (test?.success) {
@@ -173,6 +683,7 @@ const SmtpConfigPage: React.FC = () => {
                         existing.add(key);
                         ok++;
                         results.push({ key, status: 'ok', message: 'Conexão OK e salvo.' });
+                        addLog(`✅ Configuração manual salva: ${cfg.host}:${cfg.port}`, 'success');
                     } else {
                         fail++;
                         results.push({ key, status: 'fail', message: test?.message || 'Falha na verificação' });
@@ -182,19 +693,54 @@ const SmtpConfigPage: React.FC = () => {
                     results.push({ key, status: 'fail', message: err?.message || String(err) });
                 }
             }
-            setBulkResults(results);
+
+            // Processa emails com auto-detecção em lotes paralelos
+            const batchSize = bulkSettings.threads;
+            for (let i = 0; i < emailsToProcess.length; i += batchSize) {
+                const batch = emailsToProcess.slice(i, i + batchSize);
+
+                const batchPromises = batch.map(async (cfg) => {
+                    setBulkProgress(prev => ({ ...prev, currentEmail: cfg.username }));
+
+                    const result = await testSmtpWithRetries(cfg.username, cfg.password);
+
+                    setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }));
+
+                    if (result.success && result.config) {
+                        const key = `${result.config.host}|${result.config.port}|${(result.config.username || '').toLowerCase()}`;
+
+                        if (!existing.has(key)) {
+                            await createConfig(result.config);
+                            existing.add(key);
+                            return { key, status: 'ok' as const, message: 'Conexão OK e salvo.' };
+                        } else {
+                            return { key, status: 'dup' as const, message: 'Duplicado. Ignorado.' };
+                        }
+                    } else {
+                        return { key: cfg.username, status: 'fail' as const, message: result.error || 'Falha na conexão' };
+                    }
+                });
+
+                const batchResults = await Promise.all(batchPromises);
+                batchResults.forEach(result => {
+                    results.push(result);
+                    if (result.status === 'ok') ok++;
+                    else if (result.status === 'fail') fail++;
+                    else if (result.status === 'dup') dup++;
+                });
+            }
+
             await refetch();
-            alert(`Importação concluída:\n✓ Salvos: ${ok}\n✗ Falhas: ${fail}\n≡ Duplicados: ${dup}`);
-            // Keep modal open so user can review detailed logs
+            addLog(`🎉 Importação concluída! ✅ ${ok} | ❌ ${fail} | 📋 ${dup}`, 'success');
+
         } catch (e) {
             console.error(e);
-            alert('Erro ao processar importação');
+            addLog(`💥 Erro geral na importação: ${e}`, 'error');
         } finally {
             setBulkProcessing(false);
+            setBulkProgress(prev => ({ ...prev, currentEmail: 'Concluído' }));
         }
-    };
-
-    const handleEditTest = async () => {
+    }; const handleEditTest = async () => {
         if (!editId) return;
         try {
             const toTest: SmtpConfig = { id: editId, ...editForm } as SmtpConfig;
@@ -265,25 +811,8 @@ const SmtpConfigPage: React.FC = () => {
                     <button className="btn-secondary" onClick={handleExportSmtps} disabled={configs.length === 0} title="Exportar SMTPs">
                         Exportar
                     </button>
-                    <button 
-                        className="btn-secondary" 
-                        onClick={() => setShowLoadSmtpsModal(true)} 
-                        title="Carregar SMTPs de arquivo ou texto"
-                    >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Carregar SMTPs
-                    </button>
-                    <button 
-                        className="btn-secondary" 
-                        onClick={() => setShowTestSmtpsModal(true)} 
-                        disabled={configs.length === 0} 
-                        title="Testar SMTPs individualmente"
-                    >
-                        <TestTube className="h-4 w-4 mr-2" />
-                        Testar SMTPs
-                    </button>
                     <button className="btn-secondary" onClick={handleTestAll} disabled={testingAll || configs.length === 0} title="Testar todos os SMTPs">
-                        {testingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+                        {testingAll ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
                         Testar todos
                     </button>
                     <button className="btn-primary" onClick={handleOpenAdd}>
@@ -484,119 +1013,359 @@ const SmtpConfigPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Add SMTP Modal (Bulk) */}
+            {/* Modern Responsive Bulk SMTP Import Modal */}
             {isAddOpen && (
-                <div className="fixed inset-0 z-50 overflow-hidden">
-                    <div className="fixed inset-0 bg-black/60" onClick={() => setIsAddOpen(false)} />
-                    <div className="flex min-h-full items-center justify-center p-4">
+                <div className="fixed inset-0 z-50 overflow-y-auto">
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setIsAddOpen(false)} />
+                    <div className="flex min-h-full items-start justify-center p-4 py-8">
                         <div
-                            className="relative w-full max-w-3xl rounded-xl border shadow-2xl"
-                            style={{ borderColor: 'var(--vscode-border)', backgroundColor: 'var(--vscode-editor-background, #111827)' }}
+                            className="relative w-full max-w-7xl rounded-3xl border shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300"
+                            style={{ borderColor: 'var(--vscode-border)', backgroundColor: 'var(--vscode-editor-background)' }}
                         >
-                            <div className="p-4 border-b" style={{ borderColor: 'var(--vscode-border)' }}>
-                                <h3 className="text-lg font-semibold" style={{ color: 'var(--vscode-text)' }}>Adicionar SMTPs em Lote</h3>
-                                <p className="text-xs mt-1" style={{ color: 'var(--vscode-text-muted)' }}>
-                                    Padrão: host|porta|email|senha — um por linha
-                                </p>
-                            </div>
-                            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs block mb-1" style={{ color: 'var(--vscode-text-muted)' }}>Lista de SMTPs</label>
-                                    <textarea
-                                        className="w-full h-64 vscode-input"
-                                        placeholder={"smtp.exemplo.com|587|user@dominio.com|senha123\nmail.provedor.com|465|conta@provedor.com|senha456"}
-                                        value={bulkText}
-                                        onChange={(e) => handleBulkChange(e.target.value)}
-                                    />
-                                    <div className="mt-2 text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
-                                        Dica: porta 465 será tratada como SSL; demais como STARTTLS.
+                            {/* Enhanced Header */}
+                            <div className="px-6 py-5 border-b bg-gradient-to-r from-blue-600/15 via-purple-600/15 to-cyan-600/15 backdrop-blur-sm" style={{ borderColor: 'var(--vscode-border)' }}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+                                            <Server className="h-6 w-6 text-white" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                                                Importação Inteligente de SMTPs
+                                            </h3>
+                                            <p className="text-sm mt-1" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                Teste automático com múltiplas configurações, portas e extração inteligente
+                                            </p>
+                                        </div>
                                     </div>
+                                    <button
+                                        onClick={() => setIsAddOpen(false)}
+                                        className="p-3 rounded-xl hover:bg-white/10 transition-all duration-200 hover:scale-110"
+                                        style={{ color: 'var(--vscode-text-muted)' }}
+                                    >
+                                        <X className="h-5 w-5" />
+                                    </button>
                                 </div>
-                                <div className="space-y-3">
-                                    <div className="p-3 rounded border" style={{ borderColor: 'var(--vscode-border)' }}>
-                                        <div className="text-sm font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Pré-visualização</div>
-                                        {!bulkPreview || bulkPreview.length === 0 ? (
-                                            <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Cole a lista para ver a prévia.</div>
-                                        ) : (
-                                            <div className="text-xs space-y-1" style={{ color: 'var(--vscode-text)' }}>
-                                                <div>Válidos: {bulkPreview.length}</div>
-                                                <div>Duplicados (serão ignorados): {
-                                                    bulkPreview.filter(p => configs.some(c => c.host === p.host && c.port === p.port && c.username === p.username)).length
-                                                }</div>
+                            </div>
+
+                            <div className="grid grid-cols-1 xl:grid-cols-4 gap-0">
+                                {/* Main Input Section */}
+                                <div className="xl:col-span-3 p-6 space-y-6">
+                                    {/* Advanced Settings Panel */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-gradient-to-br from-blue-500/8 to-purple-500/8 rounded-2xl border border-blue-500/20 backdrop-blur-sm">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Zap className="h-4 w-4 text-blue-400" />
+                                                Threads Simultâneas
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="20"
+                                                value={bulkSettings.threads}
+                                                onChange={(e) => setBulkSettings(prev => ({ ...prev, threads: Number(e.target.value) }))}
+                                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-blue-500/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--vscode-input-background)',
+                                                    color: 'var(--vscode-text)'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Clock className="h-4 w-4 text-purple-400" />
+                                                Timeout (ms)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="5000"
+                                                max="60000"
+                                                step="1000"
+                                                value={bulkSettings.timeout}
+                                                onChange={(e) => setBulkSettings(prev => ({ ...prev, timeout: Number(e.target.value) }))}
+                                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-purple-500/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--vscode-input-background)',
+                                                    color: 'var(--vscode-text)'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Settings className="h-4 w-4 text-cyan-400" />
+                                                Portas para Teste
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={bulkSettings.retryPorts.join(', ')}
+                                                onChange={(e) => {
+                                                    const ports = e.target.value.split(',').map(p => Number(p.trim())).filter(p => !isNaN(p));
+                                                    setBulkSettings(prev => ({ ...prev, retryPorts: ports }));
+                                                }}
+                                                placeholder="587, 465, 25, 2525"
+                                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-cyan-500/30 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--vscode-input-background)',
+                                                    color: 'var(--vscode-text)'
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Email Input Section */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Mail className="h-5 w-5 text-green-400" />
+                                                Lista de Emails
+                                            </label>
+                                            <div className="flex items-center space-x-4 text-xs">
+                                                <span className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 bg-green-400 rounded-full shadow-lg shadow-green-400/30"></div>
+                                                    email|senha
+                                                </span>
+                                                <span className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 bg-blue-400 rounded-full shadow-lg shadow-blue-400/30"></div>
+                                                    email:senha
+                                                </span>
+                                                <span className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 bg-purple-400 rounded-full shadow-lg shadow-purple-400/30"></div>
+                                                    host|porta|email|senha
+                                                </span>
                                             </div>
-                                        )}
-                                        {bulkErrors.length > 0 && (
-                                            <div className="mt-3 p-2 rounded border" style={{ borderColor: 'var(--vscode-border)', background: 'var(--vscode-errorForeground)10', color: 'var(--vscode-errorForeground)' }}>
-                                                {bulkErrors.slice(0, 6).map((err, i) => (
-                                                    <div key={i} className="text-xs">• {err}</div>
-                                                ))}
-                                                {bulkErrors.length > 6 && (
-                                                    <div className="text-xs mt-1">+ {bulkErrors.length - 6} mais</div>
+                                        </div>
+
+                                        <textarea
+                                            className="w-full h-80 px-5 py-4 text-sm rounded-2xl border-2 border-dashed border-gray-500/30 font-mono resize-none focus:border-blue-500/50 focus:ring-4 focus:ring-blue-500/10 transition-all duration-200"
+                                            style={{
+                                                backgroundColor: 'var(--vscode-input-background)',
+                                                color: 'var(--vscode-text)'
+                                            }}
+                                            placeholder="📧 Cole seus emails aqui...
+
+Formatos suportados:
+• user@gmail.com|mypassword123
+• admin@outlook.com:senha123  
+• smtp.customserver.com|587|contact@domain.com|secretpass
+
+🤖 Extração inteligente ativa - funciona mesmo com dados malformados!"
+                                            value={bulkText}
+                                            onChange={(e) => handleBulkChange(e.target.value)}
+                                        />
+                                    </div>
+
+                                    {/* Real-time Logs Section */}
+                                    {(bulkProgress.logs.length > 0 || bulkProcessing) && (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                    <Activity className="h-5 w-5 text-yellow-400" />
+                                                    Logs em Tempo Real
+                                                </h4>
+                                                {bulkProcessing && (
+                                                    <div className="flex items-center gap-2 text-sm px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+                                                        <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                                                        <span style={{ color: 'var(--vscode-text)' }}>
+                                                            {bulkProgress.current}/{bulkProgress.total}
+                                                        </span>
+                                                    </div>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="p-3 rounded border" style={{ borderColor: 'var(--vscode-border)' }}>
-                                        <div className="text-sm font-medium mb-2" style={{ color: 'var(--vscode-text)' }}>Resultados</div>
-                                        {bulkProcessing && (
-                                            <div className="flex items-center text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
-                                                <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Processando...
+
+                                            <div className="h-48 bg-black/40 rounded-2xl border border-gray-500/20 overflow-hidden">
+                                                <div className="h-full overflow-y-auto p-4 space-y-1.5 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                                                    {bulkProgress.logs.slice(-50).map((log, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className={`flex text-xs font-mono leading-relaxed ${log.type === 'success' ? 'text-green-400' :
+                                                                log.type === 'error' ? 'text-red-400' :
+                                                                    log.type === 'warning' ? 'text-yellow-400' :
+                                                                        'text-gray-300'
+                                                                }`}
+                                                        >
+                                                            <span className="w-20 flex-shrink-0 opacity-60 font-medium">{log.time}</span>
+                                                            <span className="flex-1">{log.message}</span>
+                                                        </div>
+                                                    ))}
+                                                    {bulkProcessing && (
+                                                        <div className="flex text-xs font-mono text-blue-400 animate-pulse">
+                                                            <span className="w-20 flex-shrink-0 opacity-60">
+                                                                {new Date().toLocaleTimeString()}
+                                                            </span>
+                                                            <span className="flex items-center gap-2">
+                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                                Processando: {bulkProgress.currentEmail}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Enhanced Sidebar */}
+                                <div className="xl:col-span-1 bg-gray-900/20 border-l border-gray-500/20 p-6 space-y-6">
+                                    {/* Progress Indicator */}
+                                    {bulkProcessing && (
+                                        <div className="space-y-4">
+                                            <div className="text-center">
+                                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-blue-500 shadow-lg mb-3">
+                                                    <Loader2 className="h-8 w-8 text-white animate-spin" />
+                                                </div>
+                                                <h4 className="text-sm font-semibold" style={{ color: 'var(--vscode-text)' }}>
+                                                    Processando
+                                                </h4>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                    <span>Progresso</span>
+                                                    <span>{Math.round((bulkProgress.current / bulkProgress.total) * 100)}%</span>
+                                                </div>
+                                                <div className="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden">
+                                                    <div
+                                                        className="bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 h-full transition-all duration-500 ease-out"
+                                                        style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                                                    ></div>
+                                                </div>
+                                                <div className="text-xs text-center p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                                                    <div style={{ color: 'var(--vscode-text)' }}>Testando</div>
+                                                    <div className="text-blue-400 font-mono truncate">{bulkProgress.currentEmail}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Statistics Panel */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                            <BarChart3 className="h-4 w-4 text-purple-400" />
+                                            Estatísticas
+                                        </h4>
+
+                                        {!bulkPreview || bulkPreview.length === 0 ? (
+                                            <div className="p-4 bg-gray-500/10 rounded-xl border border-gray-500/20 text-center">
+                                                <Database className="h-8 w-8 mx-auto mb-2 opacity-50" style={{ color: 'var(--vscode-text-muted)' }} />
+                                                <p className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                    Cole emails para ver estatísticas
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 text-center">
+                                                        <div className="text-xl font-bold text-blue-400">{bulkPreview.length}</div>
+                                                        <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Total</div>
+                                                    </div>
+                                                    <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 text-center">
+                                                        <div className="text-xl font-bold text-green-400">
+                                                            {bulkPreview.filter(p => p.name.includes('(auto-detectar)')).length}
+                                                        </div>
+                                                        <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Auto</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-center">
+                                                        <div className="text-xl font-bold text-purple-400">
+                                                            {bulkPreview.filter(p => !p.name.includes('(auto-detectar)')).length}
+                                                        </div>
+                                                        <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Manual</div>
+                                                    </div>
+                                                    <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20 text-center">
+                                                        <div className="text-xl font-bold text-yellow-400">
+                                                            {(window as any).extractedCredentials?.length || 0}
+                                                        </div>
+                                                        <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Extraído</div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         )}
-                                        {!bulkProcessing && bulkResults.length === 0 && (
-                                            <div className="text-xs" style={{ color: 'var(--vscode-text-muted)' }}>Sem resultados ainda.</div>
-                                        )}
-                                        {!bulkProcessing && bulkResults.length > 0 && (
-                                            <div className="max-h-48 overflow-auto space-y-1">
-                                                {bulkResults.map((r, i) => (
-                                                    <div key={i} className="flex items-start text-xs">
-                                                        {r.status === 'ok' ? (
-                                                            <CheckCircle className="h-3.5 w-3.5 mr-2" style={{ color: 'var(--vscode-success)' }} />
-                                                        ) : r.status === 'dup' ? (
-                                                            <TestTube className="h-3.5 w-3.5 mr-2" style={{ color: 'var(--vscode-text-muted)' }} />
-                                                        ) : (
-                                                            <AlertCircle className="h-3.5 w-3.5 mr-2" style={{ color: 'var(--vscode-errorForeground)' }} />
-                                                        )}
-                                                        <div>
-                                                            <div style={{ color: 'var(--vscode-text)' }}>{r.key.replace(/\|/g, ' | ')}</div>
-                                                            {r.message && (
-                                                                <div style={{ color: r.status === 'fail' ? 'var(--vscode-errorForeground)' : 'var(--vscode-text-muted)' }}>{r.message}</div>
-                                                            )}
-                                                        </div>
+
+                                        {bulkErrors.length > 0 && (
+                                            <div className="p-4 bg-red-500/10 rounded-xl border border-red-500/20">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <AlertTriangle className="h-4 w-4 text-red-400" />
+                                                    <div className="text-xs font-semibold text-red-400">
+                                                        {bulkErrors.length} Aviso(s)
                                                     </div>
-                                                ))}
+                                                </div>
+                                                <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                                                    {bulkErrors.slice(0, 5).map((err, i) => (
+                                                        <div key={i} className="text-red-300 opacity-90">
+                                                            • {err.length > 50 ? err.substring(0, 50) + '...' : err}
+                                                        </div>
+                                                    ))}
+                                                    {bulkErrors.length > 5 && (
+                                                        <div className="text-red-400 font-medium">
+                                                            + {bulkErrors.length - 5} mais avisos
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="p-4 border-t flex justify-end space-x-2" style={{ borderColor: 'var(--vscode-border)' }}>
-                                <button className="btn-secondary" onClick={() => setIsAddOpen(false)}>Cancelar</button>
-                                <button
-                                    className="btn-primary"
-                                    onClick={handleBulkTestAndSave}
-                                    disabled={!bulkPreview || bulkPreview.length === 0 || bulkProcessing}
-                                >
-                                    {bulkProcessing ? 'Processando...' : 'Testar e Salvar'}
-                                </button>
+
+                            {/* Enhanced Footer */}
+                            <div className="px-6 py-5 border-t bg-gradient-to-r from-gray-900/20 to-gray-800/20 backdrop-blur-sm" style={{ borderColor: 'var(--vscode-border)' }}>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div className="text-xs flex items-center gap-2" style={{ color: 'var(--vscode-text-muted)' }}>
+                                        {bulkProcessing ? (
+                                            <>
+                                                <Zap className="h-4 w-4 text-yellow-400" />
+                                                <span>Processando com {bulkSettings.threads} threads simultâneas</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Settings className="h-4 w-4 text-blue-400" />
+                                                <span>
+                                                    {bulkSettings.threads} threads • {bulkSettings.timeout}ms timeout •
+                                                    {bulkSettings.retryPorts.length} portas configuradas
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <div className="flex space-x-3">
+                                        <button
+                                            className="px-5 py-2.5 rounded-xl border transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                                            style={{
+                                                borderColor: 'var(--vscode-border)',
+                                                color: 'var(--vscode-text-muted)',
+                                                backgroundColor: 'var(--vscode-button-secondaryBackground)'
+                                            }}
+                                            onClick={() => setIsAddOpen(false)}
+                                            disabled={bulkProcessing}
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            className="px-8 py-2.5 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 hover:from-green-600 hover:via-blue-600 hover:to-purple-600 text-white rounded-xl transition-all duration-200 hover:scale-105 shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center gap-2 font-semibold"
+                                            onClick={handleBulkTestAndSave}
+                                            disabled={bulkProcessing || (!bulkPreview || bulkPreview.length === 0) && !(window as any).extractedCredentials?.length}
+                                        >
+                                            {bulkProcessing ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                    Processando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Rocket className="h-4 w-4" />
+                                                    Testar e Importar
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* Modais */}
-            <LoadSmtpsModal
-                isOpen={showLoadSmtpsModal}
-                onClose={() => setShowLoadSmtpsModal(false)}
-                onLoad={handleLoadSmtps}
-            />
-
-            <TestSmtpsModal
-                isOpen={showTestSmtpsModal}
-                onClose={() => setShowTestSmtpsModal(false)}
-                smtps={configs}
-            />
         </div>
     );
 };

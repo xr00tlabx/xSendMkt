@@ -7,6 +7,7 @@ interface AppSettings {
     emailDelay: number;
     autoSave: boolean;
     smtpTimeoutMs: number;
+    smtpSubdomains: string;
 }
 
 const SettingsPage: React.FC = () => {
@@ -15,7 +16,8 @@ const SettingsPage: React.FC = () => {
         simultaneousEmails: 5,
         emailDelay: 1000,
         autoSave: true,
-        smtpTimeoutMs: 10000
+        smtpTimeoutMs: 10000,
+        smtpSubdomains: 'smtp.\nmail.\nwebmail.\n@'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -35,13 +37,15 @@ const SettingsPage: React.FC = () => {
             const emailDelay = await window.electronAPI?.database?.getSetting('delay_between_emails');
             const autoSave = await window.electronAPI?.database?.getSetting('auto_save_campaigns');
             const smtpTimeoutMs = await window.electronAPI?.database?.getSetting('smtp_timeout_ms');
+            const smtpSubdomains = await window.electronAPI?.database?.getSetting('smtp_subdomains');
 
             setSettings({
                 listsDirectory: listsDir || '',
                 simultaneousEmails: parseInt(simultaneousEmails || '5', 10),
                 emailDelay: parseInt(emailDelay || '1000', 10),
                 autoSave: (autoSave === 'true' || autoSave === true),
-                smtpTimeoutMs: parseInt(smtpTimeoutMs || '10000', 10)
+                smtpTimeoutMs: parseInt(smtpTimeoutMs || '10000', 10),
+                smtpSubdomains: smtpSubdomains || 'smtp.\nmail.\nwebmail.\n@'
             });
         } catch (error) {
             // console.error('Erro ao carregar configurações:', error);
@@ -88,6 +92,7 @@ const SettingsPage: React.FC = () => {
             await window.electronAPI?.database?.setSetting('delay_between_emails', settings.emailDelay.toString(), 'number');
             await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
             await window.electronAPI?.database?.setSetting('smtp_timeout_ms', settings.smtpTimeoutMs.toString(), 'number');
+            await window.electronAPI?.database?.setSetting('smtp_subdomains', settings.smtpSubdomains, 'string');
 
             alert('Configurações salvas com sucesso!');
         } catch (error) {
@@ -200,6 +205,22 @@ const SettingsPage: React.FC = () => {
                                         onChange={(e) => handleInputChange('smtpTimeoutMs', parseInt(e.target.value, 10))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Subdomínios SMTP Servers
+                                    </label>
+                                    <textarea
+                                        value={settings.smtpSubdomains}
+                                        onChange={(e) => handleInputChange('smtpSubdomains', e.target.value)}
+                                        rows={6}
+                                        placeholder="smtp.&#10;mail.&#10;webmail.&#10;@"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Um subdomínio por linha. Usado para detectar automaticamente servidores SMTP quando apenas email e senha forem fornecidos. O símbolo "@" representa o domínio completo.
+                                    </p>
                                 </div>
 
                                 <div className="flex items-center">

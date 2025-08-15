@@ -243,3 +243,70 @@ export async function lookupMxRecord(_domain: string): Promise<string | null> {
     // Esta função pode ser expandida para fazer consultas DNS reais
     return null;
 }
+
+/**
+ * Detecta SMTP usando subdomínios configurados pelo usuário
+ */
+export async function detectSmtpWithCustomSubdomains(email: string): Promise<SmtpDetectionResult[]> {
+    const domain = email.split('@')[1]?.toLowerCase();
+
+    if (!domain) {
+        return [];
+    }
+
+    // Primeiro, tenta detectar com provedores conhecidos
+    const knownProvider = detectSmtpFromEmail(email);
+    const results: SmtpDetectionResult[] = [];
+
+    if (knownProvider.detected) {
+        results.push(knownProvider);
+    }
+
+    try {
+        // Carrega subdomínios das configurações
+        const smtpSubdomains = await window.electronAPI?.database?.getSetting('smtp_subdomains');
+        const subdomains = (smtpSubdomains || 'smtp.\nmail.\nwebmail.\n@')
+            .split('\n')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0);
+
+        // Gera possíveis hosts baseado nos subdomínios configurados
+        for (const subdomain of subdomains) {
+            let host: string;
+
+            if (subdomain === '@') {
+                // Usar o domínio diretamente
+                host = domain;
+            } else if (subdomain.endsWith('.')) {
+                // Subdomínio + domínio
+                host = subdomain + domain;
+            } else {
+                // Assumir que é um subdomínio completo
+                host = subdomain;
+            }
+
+            // Adiciona tentativas com porta 587 (STARTTLS) e 465 (SSL)
+            if (!results.some(r => r.host === host)) {
+                results.push({
+                    host,
+                    port: 587,
+                    secure: false,
+                    detected: false,
+                    provider: `Custom - ${host}`
+                });
+
+                results.push({
+                    host,
+                    port: 465,
+                    secure: true,
+                    detected: false,
+                    provider: `Custom SSL - ${host}`
+                });
+            }
+        }
+    } catch (error) {
+        console.warn('Erro ao carregar subdomínios SMTP:', error);
+    }
+
+    return results;
+}
