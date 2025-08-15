@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { 
-    Mail, 
-    Send, 
-    Pause, 
-    Play, 
-    Square, 
-    CheckCircle, 
-    AlertCircle, 
-    Clock, 
+import {
     Activity,
-    Users,
-    Server
+    AlertCircle,
+    CheckCircle,
+    Clock,
+    Mail,
+    Pause,
+    Play,
+    Send,
+    Server,
+    Square,
+    Users
 } from 'lucide-react';
-import { useEmailLists, useSmtpConfigs, useEmailSender } from '../hooks';
+import React, { useState } from 'react';
+import { useEmailLists, useEmailSender, useSmtpConfigs } from '../hooks';
 import type { EmailCampaign } from '../types';
 
 const NewHomePage: React.FC = () => {
@@ -342,38 +342,70 @@ const NewHomePage: React.FC = () => {
                         <div className="bg-white rounded-lg shadow-sm p-6">
                             <h3 className="text-lg font-semibold mb-4">Logs de Envio</h3>
                             
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {/* Status dos SMTPs em standby */}
+                            {standbySmtps.length > 0 && (
+                                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Clock className="w-4 h-4 text-yellow-600" />
+                                        <span className="text-sm font-medium text-yellow-800">
+                                            {standbySmtps.length} SMTP(s) em standby
+                                        </span>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {standbySmtps.map(smtp => (
+                                            <div key={smtp.id} className="text-xs text-yellow-700">
+                                                <span className="font-medium">{smtp.name}</span>
+                                                {smtp.standbyUntil && (
+                                                    <span className="ml-2">
+                                                        ({Math.ceil((smtp.standbyUntil.getTime() - Date.now()) / 60000)} min restante)
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2 max-h-80 overflow-y-auto">
                                 {state.logs.length === 0 ? (
                                     <div className="text-center py-8 text-gray-500">
                                         <Mail className="w-8 h-8 mx-auto mb-2 opacity-50" />
                                         <p className="text-sm">Nenhum log ainda</p>
                                     </div>
                                 ) : (
-                                    state.logs.slice(0, 50).map((log) => (
-                                        <div
-                                            key={log.id}
-                                            className={`p-3 rounded-lg text-sm ${
-                                                log.type === 'success' ? 'bg-green-50 text-green-800' :
-                                                log.type === 'error' ? 'bg-red-50 text-red-800' :
-                                                log.type === 'warning' ? 'bg-yellow-50 text-yellow-800' :
-                                                'bg-blue-50 text-blue-800'
-                                            }`}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="font-medium truncate">{log.message}</div>
-                                                    {log.email && (
-                                                        <div className="text-xs opacity-75 truncate">
-                                                            {log.email}
+                                        state.logs.slice(0, 100).map((log) => {
+                                            const smtp = configs.find(s => s.id === log.smtpId);
+                                            return (
+                                                <div
+                                                    key={log.id}
+                                                className={`p-3 rounded-lg text-sm border-l-4 ${log.type === 'success'
+                                                        ? 'bg-green-50 text-green-800 border-green-500' :
+                                                        log.type === 'error'
+                                                            ? 'bg-red-50 text-red-800 border-red-500' :
+                                                            log.type === 'warning'
+                                                                ? 'bg-yellow-50 text-yellow-800 border-yellow-500' :
+                                                                'bg-blue-50 text-blue-800 border-blue-500'
+                                                    }`}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="font-medium truncate">{log.message}</div>
+                                                        <div className="flex items-center gap-3 mt-1 text-xs opacity-75">
+                                                            {log.email && (
+                                                                <span className="truncate">{log.email}</span>
+                                                            )}
+                                                            {smtp && (
+                                                                <span className="flex-shrink-0">SMTP: {smtp.name}</span>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs opacity-75 ml-2 flex-shrink-0">
-                                                    {log.timestamp.toLocaleTimeString()}
+                                                    </div>
+                                                    <div className="text-xs opacity-75 ml-2 flex-shrink-0">
+                                                        {log.timestamp.toLocaleTimeString()}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 )}
                             </div>
                         </div>

@@ -1,12 +1,11 @@
-import React from 'react';
-import { 
-    List, 
-    Server,
+import {
     CheckCircle,
-    AlertCircle,
     Clock,
-    Mail
+    List,
+    Mail,
+    Server
 } from 'lucide-react';
+import React from 'react';
 import type { EmailList, SmtpConfig } from '../../types';
 
 interface SimpleSidebarProps {

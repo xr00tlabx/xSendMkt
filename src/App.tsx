@@ -1,8 +1,12 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import InterfaceDemo from './components/InterfaceDemo';
+import ElectronLayout from './components/layout/ElectronLayout';
 import Layout from './components/layout/Layout';
 import ModalLayout from './components/layout/ModalLayout';
 import EmailListsPage from './pages/EmailListsPage';
 import HomePage from './pages/HomePage';
+import NewHomePageVSCode from './pages/NewHomePageVSCode';
+import UltraCompactHomePageVSCode from './pages/UltraCompactHomePageVSCode';
 import SettingsPage from './pages/SettingsPage';
 import SmtpConfigPage from './pages/SmtpConfigPage';
 import StatisticsPage from './pages/StatisticsPage';
@@ -60,16 +64,21 @@ function App() {
     return (
         <Router>
             <Routes>
-                <Route path="/" element={<Layout />}>
-                    <Route index element={<HomePage />} />
-                    <Route path="/email-lists" element={<EmailListsPage />} />
-                    <Route path="/smtp-config" element={<SmtpConfigPage />} />
-                    <Route path="/statistics" element={<StatisticsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/" element={<ElectronLayout />}>
+                    <Route index element={<UltraCompactHomePageVSCode />} />
+                    <Route path="/home-vscode" element={<NewHomePageVSCode />} />
+                    <Route path="/home-old" element={<HomePage />} />
+                    <Route path="/demo" element={<InterfaceDemo />} />
+                </Route>
+                <Route path="/modal" element={<Layout />}>
+                    <Route path="email-lists" element={<EmailListsPage />} />
+                    <Route path="smtp-config" element={<SmtpConfigPage />} />
+                    <Route path="statistics" element={<StatisticsPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
                     {/* Legacy routes for compatibility */}
-                    <Route path="/lists" element={<EmailListsPage />} />
-                    <Route path="/smtp" element={<SmtpConfigPage />} />
-                    <Route path="/stats" element={<StatisticsPage />} />
+                    <Route path="lists" element={<EmailListsPage />} />
+                    <Route path="smtp" element={<SmtpConfigPage />} />
+                    <Route path="stats" element={<StatisticsPage />} />
                 </Route>
             </Routes>
         </Router>

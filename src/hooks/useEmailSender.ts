@@ -47,27 +47,115 @@ export const useEmailSender = () => {
         }));
     }, []);
 
+    // Função para calcular tempo de standby progressivo
+    const calculateStandbyTime = useCallback((failureCount: number): number => {
+        // Tempo base: 5 minutos = 300000ms
+        // 1ª falha: 5 min, 2ª falha: 15 min, 3ª falha: 45 min, 4ª+ falha: 2 horas
+        const baseTime = 5 * 60 * 1000; // 5 minutos
+        switch (failureCount) {
+            case 1: return baseTime; // 5 min
+            case 2: return baseTime * 3; // 15 min
+            case 3: return baseTime * 9; // 45 min
+            default: return baseTime * 24; // 2 horas
+        }
+    }, []);
+
+    // Função para marcar SMTP como standby
+    const markSmtpAsStandby = useCallback(async (smtpId: string, error: string) => {
+        setSmtpConfigs(prev => prev.map(smtp => {
+            if (smtp.id === smtpId) {
+                const newFailureCount = (smtp.failureCount || 0) + 1;
+                const standbyTime = calculateStandbyTime(newFailureCount);
+                const standbyUntil = new Date(Date.now() + standbyTime);
+
+                addLog({
+                    type: 'warning',
+                    message: `⚠️ SMTP "${smtp.name}" em standby por ${Math.round(standbyTime / 60000)} min (${newFailureCount}ª falha)`,
+                    smtpId
+                });
+
+                return {
+                    ...smtp,
+                    status: 'standby' as const,
+                    failureCount: newFailureCount,
+                    standbyUntil,
+                    lastError: error
+                };
+            }
+            return smtp;
+        }));
+    }, [calculateStandbyTime, addLog]);
+
+    // Função para verificar se SMTP saiu do standby
+    const checkStandbySmtps = useCallback(() => {
+        const now = new Date();
+        setSmtpConfigs(prev => prev.map(smtp => {
+            if (smtp.status === 'standby' && smtp.standbyUntil && now >= smtp.standbyUntil) {
+                addLog({
+                    type: 'info',
+                    message: `✅ SMTP "${smtp.name}" saiu do standby e está ativo novamente`,
+                    smtpId: smtp.id
+                });
+
+                return {
+                    ...smtp,
+                    status: 'active' as const,
+                    standbyUntil: undefined
+                };
+            }
+            return smtp;
+        }));
+    }, [addLog]);
+
+    // Verificar standby a cada 30 segundos
+    useEffect(() => {
+        const interval = setInterval(checkStandbySmtps, 30000);
+        return () => clearInterval(interval);
+    }, [checkStandbySmtps]);
+
     // Função para obter o próximo SMTP disponível
     const getNextAvailableSmtp = useCallback((): SmtpConfig | null => {
-        const activeSmtps = smtpConfigs.filter(smtp => smtp.isActive);
+        const now = new Date();
+        const availableSmtps = smtpConfigs.filter(smtp =>
+            smtp.isActive &&
+            smtp.status !== 'failed' &&
+            (smtp.status !== 'standby' || !smtp.standbyUntil || now >= smtp.standbyUntil)
+        );
         
-        if (activeSmtps.length === 0) {
+        if (availableSmtps.length === 0) {
+            addLog({
+                type: 'warning',
+                message: '⚠️ Nenhum SMTP disponível no momento'
+            });
             return null;
         }
 
-        // Rotação simples round-robin
-        const smtp = activeSmtps[currentSmtpIndex % activeSmtps.length];
+        // Rotação round-robin entre SMTPs disponíveis
+        const smtp = availableSmtps[currentSmtpIndex % availableSmtps.length];
         setCurrentSmtpIndex(prev => prev + 1);
+
+        // Atualizar último uso
+        setSmtpConfigs(prev => prev.map(s =>
+            s.id === smtp.id
+                ? { ...s, lastUsed: now, status: 'active' as const }
+                : s
+        ));
         
         return smtp;
-    }, [smtpConfigs, currentSmtpIndex]);
+    }, [smtpConfigs, currentSmtpIndex, addLog]);
 
     // Função para enviar um email
     const sendSingleEmail = useCallback(async (email: string, smtp: SmtpConfig): Promise<boolean> => {
         try {
             if (!currentCampaign) return false;
 
-            console.log('📧 Enviando email:', email, 'via SMTP:', smtp.name);
+            // Adicionar log de início de envio
+            addLog({
+                type: 'info',
+                message: `📧 Enviando para ${email} via ${smtp.name}`,
+                email,
+                smtpId: smtp.id
+            });
 
             // Atualizar estado
             setState(prev => ({ ...prev, currentEmail: email }));
@@ -88,10 +176,15 @@ export const useEmailSender = () => {
 
             // Enviar email
             const result = await window.electronAPI.email.sendSingle(emailData, parseInt(smtp.id));
-            console.log('📧 Resultado:', result);
 
             if (result && result.success !== false) {
-                // Sucesso
+                // Sucesso - resetar contador de falhas do SMTP
+                setSmtpConfigs(prev => prev.map(s =>
+                    s.id === smtp.id
+                        ? { ...s, failureCount: 0, status: 'active' as const, lastError: undefined }
+                        : s
+                ));
+
                 setState(prev => ({
                     ...prev,
                     sentEmails: prev.sentEmails + 1,
@@ -100,7 +193,7 @@ export const useEmailSender = () => {
 
                 addLog({
                     type: 'success',
-                    message: `✅ Email enviado para ${email}`,
+                    message: `✅ Email enviado para ${email} via ${smtp.name}`,
                     email,
                     smtpId: smtp.id
                 });
@@ -110,7 +203,7 @@ export const useEmailSender = () => {
                 throw new Error(result?.error || result?.message || 'Falha no envio');
             }
         } catch (error) {
-            console.error('❌ Erro ao enviar email:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
             
             setState(prev => ({
                 ...prev,
@@ -119,14 +212,17 @@ export const useEmailSender = () => {
 
             addLog({
                 type: 'error',
-                message: `❌ Falha ao enviar para ${email}: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+                message: `❌ Falha ao enviar para ${email} via ${smtp.name}: ${errorMessage}`,
                 email,
                 smtpId: smtp.id
             });
 
+            // Marcar SMTP em standby após falha
+            await markSmtpAsStandby(smtp.id, errorMessage);
+
             return false;
         }
-    }, [currentCampaign, addLog]);
+    }, [currentCampaign, addLog, markSmtpAsStandby]);
 
     // Função para processar a fila de emails
     const processEmailQueue = useCallback(async () => {

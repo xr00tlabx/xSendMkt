@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import { 
-    Mail, 
-    Send, 
-    Pause, 
-    Play, 
-    Square, 
-    CheckCircle, 
-    AlertCircle, 
-    Clock, 
+import {
     Activity,
-    Users,
-    Server
+    AlertCircle,
+    CheckCircle,
+    Clock,
+    Mail,
+    Pause,
+    Play,
+    Send,
+    Server,
+    Square,
+    Users
 } from 'lucide-react';
-import { useEmailLists, useSmtpConfigs, useEmailSender } from '../hooks';
+import React, { useState } from 'react';
+import { useEmailLists, useEmailSender, useSmtpConfigs } from '../hooks';
 import type { EmailCampaign } from '../types';
 
 

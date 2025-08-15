@@ -1,20 +1,20 @@
-import React, { useState } from 'react';
-import { 
-    Mail, 
-    Settings, 
-    List, 
+import {
     Activity,
-    Send,
-    Pause,
-    Play,
-    Square,
     AlertCircle,
     CheckCircle,
     Clock,
+    List,
+    Mail,
+    Pause,
+    Play,
+    Send,
+    Settings,
+    Square,
     Users
 } from 'lucide-react';
+import React, { useState } from 'react';
 import { useEmailSender } from '../../hooks';
-import type { EmailCampaign, SmtpConfig, EmailList, EmailSendLog } from '../../types';
+import type { EmailCampaign, EmailList, EmailSendLog, SmtpConfig } from '../../types';
 
 interface FormData {
     subject: string;
@@ -178,7 +178,7 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
                 )}
                 
                 {activeTab === 'logs' && (
-                    <LogsTab state={state} />
+                    <LogsTab state={state} smtpConfigs={smtpConfigs} />
                 )}
             </div>
         </div>
@@ -397,30 +397,60 @@ const ConfigTab: React.FC<{
                 ) : (
                     <div className="space-y-3">
                         {smtpConfigs.map((smtp) => (
-                            <div key={smtp.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-3 h-3 rounded-full ${
-                                        smtp.isActive ? 'bg-green-500' : 'bg-gray-300'
-                                    }`} />
-                                    <div>
-                                        <div className="font-medium">{smtp.name}</div>
-                                        <div className="text-sm text-gray-600">{smtp.username}</div>
+                            <div key={smtp.id} className={`p-4 border rounded-lg ${smtp.status === 'standby' ? 'border-yellow-300 bg-yellow-50' :
+                                    smtp.status === 'failed' ? 'border-red-300 bg-red-50' :
+                                        smtp.isActive ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                                }`}>
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-3">
+                                        <div className={`w-3 h-3 rounded-full mt-1 ${smtp.status === 'standby' ? 'bg-yellow-500' :
+                                                smtp.status === 'failed' ? 'bg-red-500' :
+                                                    smtp.isActive ? 'bg-green-500' : 'bg-gray-300'
+                                            }`} />
+                                        <div className="flex-1">
+                                            <div className="font-medium">{smtp.name}</div>
+                                            <div className="text-sm text-gray-600">{smtp.username}</div>
+                                            {smtp.status === 'standby' && smtp.lastError && (
+                                                <div className="text-xs text-yellow-700 mt-1">
+                                                    {smtp.failureCount} falha(s): {smtp.lastError}
+                                                </div>
+                                            )}
+                                            {smtp.status === 'failed' && smtp.lastError && (
+                                                <div className="text-xs text-red-700 mt-1">
+                                                    Falhou: {smtp.lastError}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-2">
-                                    {smtp.status === 'standby' && (
-                                        <div className="flex items-center gap-1 text-yellow-600">
-                                            <Clock className="w-4 h-4" />
-                                            <span className="text-sm">Standby</span>
-                                        </div>
-                                    )}
-                                    {smtp.isActive && smtp.status !== 'standby' && (
-                                        <div className="flex items-center gap-1 text-green-600">
-                                            <CheckCircle className="w-4 h-4" />
-                                            <span className="text-sm">Ativo</span>
-                                        </div>
-                                    )}
+
+                                    <div className="flex flex-col items-end gap-1">
+                                        {smtp.status === 'standby' && (
+                                            <div className="flex items-center gap-1 text-yellow-600">
+                                                <Clock className="w-4 h-4" />
+                                                <span className="text-sm font-medium">Standby</span>
+                                            </div>
+                                        )}
+                                        {smtp.status === 'failed' && (
+                                            <div className="flex items-center gap-1 text-red-600">
+                                                <AlertCircle className="w-4 h-4" />
+                                                <span className="text-sm font-medium">Falhou</span>
+                                            </div>
+                                        )}
+                                        {smtp.isActive && smtp.status !== 'standby' && smtp.status !== 'failed' && (
+                                            <div className="flex items-center gap-1 text-green-600">
+                                                <CheckCircle className="w-4 h-4" />
+                                                <span className="text-sm font-medium">Ativo</span>
+                                            </div>
+                                        )}
+                                        {smtp.status === 'standby' && smtp.standbyUntil && (
+                                            <div className="text-xs text-yellow-600">
+                                                {new Date(smtp.standbyUntil) > new Date()
+                                                    ? `${Math.ceil((smtp.standbyUntil.getTime() - Date.now()) / 60000)} min`
+                                                    : 'Pronto'
+                                                }
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -434,7 +464,8 @@ const ConfigTab: React.FC<{
 // Tab de Logs
 const LogsTab: React.FC<{
     state: any;
-}> = ({ state }) => {
+    smtpConfigs: SmtpConfig[];
+}> = ({ state, smtpConfigs }) => {
     const getLogIcon = (type: string) => {
         switch (type) {
             case 'success':
@@ -448,8 +479,82 @@ const LogsTab: React.FC<{
         }
     };
 
+    const formatTimeRemaining = (standbyUntil: Date) => {
+        const now = new Date();
+        const diff = standbyUntil.getTime() - now.getTime();
+        if (diff <= 0) return "Pronto para ativar";
+
+        const minutes = Math.ceil(diff / 60000);
+        if (minutes < 60) return `${minutes} min restante(s)`;
+
+        const hours = Math.ceil(minutes / 60);
+        return `${hours}h ${minutes % 60}min restante(s)`;
+    };
+
+    const standbySmtps = smtpConfigs.filter(smtp => smtp.status === 'standby');
+    const activeSmtps = smtpConfigs.filter(smtp => smtp.isActive && smtp.status !== 'standby');
+    const failedSmtps = smtpConfigs.filter(smtp => smtp.status === 'failed');
+
     return (
-        <div className="h-full overflow-y-auto p-6">
+        <div className="h-full overflow-y-auto p-6 space-y-6">
+            {/* Status dos SMTPs */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Status dos SMTPs</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                            <span className="font-medium text-green-800">Ativos</span>
+                        </div>
+                        <div className="text-2xl font-bold text-green-600 mt-2">{activeSmtps.length}</div>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-yellow-500" />
+                            <span className="font-medium text-yellow-800">Em Standby</span>
+                        </div>
+                        <div className="text-2xl font-bold text-yellow-600 mt-2">{standbySmtps.length}</div>
+                    </div>
+
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5 text-red-500" />
+                            <span className="font-medium text-red-800">Falhados</span>
+                        </div>
+                        <div className="text-2xl font-bold text-red-600 mt-2">{failedSmtps.length}</div>
+                    </div>
+                </div>
+
+                {/* Detalhes dos SMTPs em Standby */}
+                {standbySmtps.length > 0 && (
+                    <div className="mt-4">
+                        <h4 className="font-medium text-gray-900 mb-3">SMTPs em Standby:</h4>
+                        <div className="space-y-2">
+                            {standbySmtps.map(smtp => (
+                                <div key={smtp.id} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="font-medium text-gray-900">{smtp.name}</div>
+                                            <div className="text-sm text-gray-600">
+                                                {smtp.failureCount} falha(s) • {smtp.lastError}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-sm font-medium text-yellow-600">
+                                                {smtp.standbyUntil ? formatTimeRemaining(smtp.standbyUntil) : 'Calculando...'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Logs de Envio */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">Logs de Envio</h3>
@@ -464,31 +569,33 @@ const LogsTab: React.FC<{
                     </div>
                 ) : (
                     <div className="space-y-3 max-h-96 overflow-y-auto">
-                        {state.logs.map((log: EmailSendLog) => (
-                            <div
-                                key={log.id}
-                                className={`p-4 rounded-lg border-l-4 ${
-                                    log.type === 'success' ? 'border-green-500 bg-green-50' :
-                                    log.type === 'error' ? 'border-red-500 bg-red-50' :
-                                    log.type === 'warning' ? 'border-yellow-500 bg-yellow-50' :
-                                    'border-blue-500 bg-blue-50'
-                                }`}
-                            >
-                                <div className="flex items-start gap-3">
-                                    {getLogIcon(log.type)}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-sm font-medium text-gray-900">
-                                            {log.message}
-                                        </div>
-                                        <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
-                                            <span>{log.timestamp.toLocaleTimeString()}</span>
-                                            {log.email && <span>Para: {log.email}</span>}
-                                            {log.smtpId && <span>SMTP: {log.smtpId}</span>}
+                            {state.logs.map((log: EmailSendLog) => {
+                                const smtp = smtpConfigs.find(s => s.id === log.smtpId);
+                                return (
+                                    <div
+                                        key={log.id}
+                                        className={`p-4 rounded-lg border-l-4 ${log.type === 'success' ? 'border-green-500 bg-green-50' :
+                                                log.type === 'error' ? 'border-red-500 bg-red-50' :
+                                                    log.type === 'warning' ? 'border-yellow-500 bg-yellow-50' :
+                                                        'border-blue-500 bg-blue-50'
+                                            }`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            {getLogIcon(log.type)}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="text-sm font-medium text-gray-900">
+                                                    {log.message}
+                                                </div>
+                                                <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                                                    <span>{log.timestamp.toLocaleTimeString()}</span>
+                                                    {log.email && <span>Para: {log.email}</span>}
+                                                {smtp && <span>SMTP: {smtp.name}</span>}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
