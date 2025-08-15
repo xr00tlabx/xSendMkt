@@ -9,8 +9,7 @@ interface CampaignFormProps {
     onSend?: (id: string) => void;
     onPause?: (id: string) => void;
     loading?: boolean;
-    selectedLists: string[];
-    totalEmails: number;
+    totalEmails?: number;
 }
 
 const CampaignForm: React.FC<CampaignFormProps> = ({
@@ -19,8 +18,7 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
     onSend,
     onPause,
     loading = false,
-    selectedLists,
-    totalEmails
+    totalEmails = 0
 }) => {
     const [formData, setFormData] = useState({
         subject: campaign?.subject || '',
@@ -88,10 +86,11 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
         try {
             const campaignData: Omit<EmailCampaign, 'id' | 'createdAt' | 'updatedAt'> = {
                 ...formData,
-                selectedLists,
+                selectedLists: [], // Não precisamos mais de listas selecionadas
                 status: 'draft',
                 totalEmails,
                 sentEmails: 0,
+                failedEmails: 0,
             };
             await Promise.resolve((onSave as any)(campaignData));
             appendLog('Draft saved.');
@@ -153,7 +152,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
     }, [dragSplit, dragLogs]);
 
     const canSend = campaign?.id &&
-        selectedLists.length > 0 &&
         formData.subject.trim() &&
         formData.sender.trim() &&
         formData.htmlContent.trim() &&
@@ -359,7 +357,6 @@ const CampaignForm: React.FC<CampaignFormProps> = ({
                     <span className="capitalize" style={{ color: 'var(--vscode-text)' }}>{campaign?.status || 'draft'}</span>
                 </div>
                 <div className="flex items-center space-x-4">
-                    <span style={{ color: 'var(--vscode-text-muted)' }}>Lists: <span style={{ color: 'var(--vscode-text)' }}>{selectedLists.length}</span></span>
                     <span style={{ color: 'var(--vscode-text-muted)' }}>Recipients: <span style={{ color: 'var(--vscode-text)' }}>{totalEmails}</span></span>
                     <div className="flex items-center space-x-2">
                         <span style={{ color: 'var(--vscode-text-muted)' }}>Progress:</span>

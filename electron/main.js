@@ -1,6 +1,7 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification } from 'electron';
+import pkg from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+const { app, BrowserWindow, dialog, ipcMain, Menu, Notification } = pkg;
 
 // Import services and handlers
 import Database from './database/index.js';

@@ -8,6 +8,7 @@ interface AppSettings {
     autoSave: boolean;
     smtpTimeoutMs: number;
     smtpSubdomains: string;
+    providerBlockList: string;
 }
 
 const SettingsPage: React.FC = () => {
@@ -17,7 +18,8 @@ const SettingsPage: React.FC = () => {
         emailDelay: 1000,
         autoSave: true,
         smtpTimeoutMs: 10000,
-        smtpSubdomains: 'smtp.\nmail.\nwebmail.\n@'
+        smtpSubdomains: 'smtp.\nmail.\nwebmail.\n@',
+        providerBlockList: 'gmail.com\noutlook.com\nhotmail.com\nyahoo.com\nlive.com\nmsn.com\nicloud.com\naol.com\nzoho.com\nprotonmail.com\nrocketmail.com\nymail.com'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -38,6 +40,7 @@ const SettingsPage: React.FC = () => {
             const autoSave = await window.electronAPI?.database?.getSetting('auto_save_campaigns');
             const smtpTimeoutMs = await window.electronAPI?.database?.getSetting('smtp_timeout_ms');
             const smtpSubdomains = await window.electronAPI?.database?.getSetting('smtp_subdomains');
+            const providerBlockList = await window.electronAPI?.database?.getSetting('provider_block_list');
 
             setSettings({
                 listsDirectory: listsDir || '',
@@ -45,7 +48,8 @@ const SettingsPage: React.FC = () => {
                 emailDelay: parseInt(emailDelay || '1000', 10),
                 autoSave: (autoSave === 'true' || autoSave === true),
                 smtpTimeoutMs: parseInt(smtpTimeoutMs || '10000', 10),
-                smtpSubdomains: smtpSubdomains || 'smtp.\nmail.\nwebmail.\n@'
+                smtpSubdomains: smtpSubdomains || 'smtp.\nmail.\nwebmail.\n@',
+                providerBlockList: providerBlockList || 'gmail.com\noutlook.com\nhotmail.com\nyahoo.com\nlive.com\nmsn.com\nicloud.com\naol.com\nzoho.com\nprotonmail.com\nrocketmail.com\nymail.com'
             });
         } catch (error) {
             // console.error('Erro ao carregar configurações:', error);
@@ -93,6 +97,7 @@ const SettingsPage: React.FC = () => {
             await window.electronAPI?.database?.setSetting('auto_save_campaigns', settings.autoSave.toString(), 'boolean');
             await window.electronAPI?.database?.setSetting('smtp_timeout_ms', settings.smtpTimeoutMs.toString(), 'number');
             await window.electronAPI?.database?.setSetting('smtp_subdomains', settings.smtpSubdomains, 'string');
+            await window.electronAPI?.database?.setSetting('provider_block_list', settings.providerBlockList, 'string');
 
             alert('Configurações salvas com sucesso!');
         } catch (error) {
@@ -220,6 +225,22 @@ const SettingsPage: React.FC = () => {
                                     />
                                     <p className="mt-1 text-xs text-gray-500">
                                         Um subdomínio por linha. Usado para detectar automaticamente servidores SMTP quando apenas email e senha forem fornecidos. O símbolo "@" representa o domínio completo.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        🚫 Provedores Bloqueados (Block List)
+                                    </label>
+                                    <textarea
+                                        value={settings.providerBlockList}
+                                        onChange={(e) => handleInputChange('providerBlockList', e.target.value)}
+                                        rows={8}
+                                        placeholder="gmail.com&#10;outlook.com&#10;yahoo.com&#10;hotmail.com&#10;live.com"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        <strong>Provedores gratuitos bloqueados:</strong> Um domínio por linha. Emails destes provedores serão rejeitados automaticamente durante a importação. Inclui Gmail, Outlook, Yahoo e outros provedores gratuitos.
                                     </p>
                                 </div>
 

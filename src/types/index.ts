@@ -17,6 +17,11 @@ export interface SmtpConfig {
     fromEmail: string; // New field to define the default sender email
     fromName: string;  // New field to define the default sender name
     isActive: boolean;
+    status?: 'active' | 'standby' | 'failed';
+    lastUsed?: Date;
+    failureCount?: number;
+    standbyUntil?: Date;
+    lastError?: string;
 }
 
 export interface EmailCampaign {
@@ -28,8 +33,32 @@ export interface EmailCampaign {
     status: 'draft' | 'sending' | 'paused' | 'completed' | 'failed';
     totalEmails: number;
     sentEmails: number;
+    failedEmails: number;
+    progress?: number;
+    currentEmail?: string;
+    isPaused?: boolean;
+    logs?: EmailSendLog[];
     createdAt: Date;
     updatedAt: Date;
+}
+
+export interface EmailSendLog {
+    id: string;
+    timestamp: Date;
+    type: 'info' | 'success' | 'error' | 'warning';
+    message: string;
+    email?: string;
+    smtpId?: string;
+}
+
+export interface SmtpUsageTracker {
+    smtpId: string;
+    lastUsed: Date;
+    usageCount: number;
+    failureCount: number;
+    isStandby: boolean;
+    standbyUntil?: Date;
+    status: 'active' | 'standby' | 'failed';
 }
 
 export interface EmailJob {

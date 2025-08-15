@@ -15,8 +15,7 @@ import {
 import { useEmailLists, useSmtpConfigs, useEmailSender } from '../hooks';
 import type { EmailCampaign } from '../types';
 
-
-const HomePage: React.FC = () => {
+const NewHomePage: React.FC = () => {
     const { lists } = useEmailLists();
     const { configs } = useSmtpConfigs();
     const { state, startSending, pauseSending, resumeSending, stopSending, canSend } = useEmailSender();
@@ -385,4 +384,4 @@ const HomePage: React.FC = () => {
     );
 };
 
-export default HomePage;
+export default NewHomePage;

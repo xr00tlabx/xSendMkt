@@ -1,5 +1,6 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import pkg from 'electron';
 import Database from '../database/index.js';
+const { BrowserWindow, ipcMain } = pkg;
 
 export function setupDatabaseHandlers() {
     // Settings handlers
@@ -142,4 +143,43 @@ export function setupDatabaseHandlers() {
             throw error;
         }
     });
+
+    /*
+    // Known SMTP configs handlers - TEMPORARIAMENTE DESABILITADOS
+    ipcMain.handle('db:add-known-smtp-config', async (event, domain, smtpHost, smtpPort, smtpSecure, providerName) => {
+        try {
+            return await Database.addKnownSmtpConfig(domain, smtpHost, smtpPort, smtpSecure, providerName);
+        } catch (error) {
+            console.error('Error adding known SMTP config:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('db:get-known-smtp-config', async (event, domain) => {
+        try {
+            return await Database.getKnownSmtpConfig(domain);
+        } catch (error) {
+            console.error('Error getting known SMTP config:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('db:get-all-known-smtp-configs', async () => {
+        try {
+            return await Database.getAllKnownSmtpConfigs();
+        } catch (error) {
+            console.error('Error getting all known SMTP configs:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('db:delete-known-smtp-config', async (event, domain) => {
+        try {
+            return await Database.deleteKnownSmtpConfig(domain);
+        } catch (error) {
+            console.error('Error deleting known SMTP config:', error);
+            throw error;
+        }
+    });
+    */
 }

@@ -30,6 +30,9 @@ export const notifySmtpConfigsUpdate = () => {
     console.log('✅ Evento smtpConfigsUpdated disparado');
 };
 
+// Export the new email sender hook
+export { useEmailSender } from './useEmailSender';
+
 export const useTxtFileCheck = () => {
     const [txtFileStatus, setTxtFileStatus] = useState<TxtFileCheck>({
         hasDirectory: false,
@@ -397,6 +400,7 @@ export const useCampaigns = () => {
                     status,
                     totalEmails: campaign.total_emails || 0,
                     sentEmails: campaign.sent_emails || 0,
+                    failedEmails: campaign.failed_emails || 0,
                     createdAt: campaign.created_at ? new Date(campaign.created_at) : new Date(),
                     updatedAt: campaign.updated_at ? new Date(campaign.updated_at) : new Date()
                 };

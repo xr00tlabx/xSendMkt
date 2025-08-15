@@ -34,6 +34,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
         // Logs
         getEmailLogs: (campaignId, limit) => ipcRenderer.invoke('db:get-email-logs', campaignId, limit)
+
+        /*
+        // Known SMTP configs - TEMPORARIAMENTE DESABILITADOS
+        addKnownSmtpConfig: (domain, smtpHost, smtpPort, smtpSecure, providerName) => 
+            ipcRenderer.invoke('db:add-known-smtp-config', domain, smtpHost, smtpPort, smtpSecure, providerName),
+        getKnownSmtpConfig: (domain) => ipcRenderer.invoke('db:get-known-smtp-config', domain),
+        getAllKnownSmtpConfigs: () => ipcRenderer.invoke('db:get-all-known-smtp-configs'),
+        deleteKnownSmtpConfig: (domain) => ipcRenderer.invoke('db:delete-known-smtp-config', domain)
+        */
     },
 
     // Email API

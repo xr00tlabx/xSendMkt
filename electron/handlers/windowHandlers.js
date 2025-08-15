@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import pkg from 'electron';
 import {
     closeModalWindow,
     createCampaignWindow,
@@ -8,6 +8,7 @@ import {
     createStatisticsWindow,
     getModalWindow
 } from '../utils/windowManager.js';
+const { ipcMain } = pkg;
 
 export function setupWindowHandlers(getMainWindow) {
     // Open settings window

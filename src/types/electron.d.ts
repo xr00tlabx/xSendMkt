@@ -18,6 +18,20 @@ export interface SmtpConfig {
     updated_at?: string;
 }
 
+export interface KnownSmtpConfig {
+    id?: number;
+    domain: string;
+    smtp_host: string;
+    smtp_port: number;
+    smtp_secure: boolean;
+    success_count?: number;
+    last_used?: string;
+    provider_name?: string;
+    notes?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface EmailData {
     to: string;
     subject: string;
@@ -152,6 +166,12 @@ export interface ElectronAPI {
 
         // Logs
         getEmailLogs: (campaignId?: number, limit?: number) => Promise<EmailLog[]>;
+
+        // Known SMTP configs
+        addKnownSmtpConfig: (domain: string, smtpHost: string, smtpPort: number, smtpSecure: boolean, providerName?: string) => Promise<void>;
+        getKnownSmtpConfig: (domain: string) => Promise<KnownSmtpConfig | null>;
+        getAllKnownSmtpConfigs: () => Promise<KnownSmtpConfig[]>;
+        deleteKnownSmtpConfig: (domain: string) => Promise<void>;
     };
 
     // Email API

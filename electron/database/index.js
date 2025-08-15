@@ -1,8 +1,9 @@
-import { app } from 'electron';
+import pkg from 'electron';
 import path from 'path';
 import { open } from 'sqlite';
 import sqlite3 from 'sqlite3';
 import { fileURLToPath } from 'url';
+const { app } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -405,6 +406,89 @@ class Database {
             return [];
         }
     }
+
+    /*
+    // Métodos para configurações SMTP conhecidas/otimizadas - TEMPORARIAMENTE DESABILITADOS
+    async addKnownSmtpConfig(domain, smtpHost, smtpPort, smtpSecure, providerName = null) {
+        await this.init();
+        try {
+            await this.db.run(
+                `INSERT OR REPLACE INTO known_smtp_configs 
+                 (domain, smtp_host, smtp_port, smtp_secure, success_count, provider_name, last_used, updated_at)
+                 VALUES (?, ?, ?, ?, COALESCE((SELECT success_count FROM known_smtp_configs WHERE domain = ?), 0) + 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                [domain, smtpHost, smtpPort, smtpSecure ? 1 : 0, domain, providerName]
+            );
+            console.log(`Configuração SMTP conhecida salva: ${domain} -> ${smtpHost}:${smtpPort}`);
+        } catch (error) {
+            console.error('Error adding known SMTP config:', error);
+            throw error;
+        }
+    }
+
+    async getKnownSmtpConfig(domain) {
+        await this.init();
+        try {
+            return await this.db.get(
+                'SELECT * FROM known_smtp_configs WHERE domain = ?',
+                [domain]
+            );
+        } catch (error) {
+            console.error('Error getting known SMTP config:', error);
+            return null;
+        }
+    }
+
+    async getAllKnownSmtpConfigs() {
+        await this.init();
+        try {
+            return await this.db.all(
+                'SELECT * FROM known_smtp_configs ORDER BY success_count DESC, last_used DESC'
+            );
+        } catch (error) {
+            console.error('Error getting all known SMTP configs:', error);
+            return [];
+        }
+    }
+
+    async deleteKnownSmtpConfig(domain) {
+        await this.init();
+        try {
+            await this.db.run('DELETE FROM known_smtp_configs WHERE domain = ?', [domain]);
+        } catch (error) {
+            console.error('Error deleting known SMTP config:', error);
+            throw error;
+        }
+    }
+
+    async initializeDefaultSmtpConfigs() {
+        await this.init();
+        try {
+            // Configurações conhecidas mais comuns no Brasil
+            const defaultConfigs = [
+                { domain: 'uol.com.br', host: 'smtp.uol.com.br', port: 587, secure: false, provider: 'UOL' },
+                { domain: 'bol.com.br', host: 'smtp.bol.com.br', port: 587, secure: false, provider: 'BOL' },
+                // ... outras configurações
+            ];
+
+            for (const config of defaultConfigs) {
+                const existing = await this.getKnownSmtpConfig(config.domain);
+                if (!existing) {
+                    await this.addKnownSmtpConfig(
+                        config.domain, 
+                        config.host, 
+                        config.port, 
+                        config.secure, 
+                        config.provider
+                    );
+                }
+            }
+            
+            console.log('Configurações SMTP padrão inicializadas');
+        } catch (error) {
+            console.error('Error initializing default SMTP configs:', error);
+        }
+    }
+    */
 
     async close() {
         if (this.db) {

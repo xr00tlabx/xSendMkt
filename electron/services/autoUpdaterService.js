@@ -1,6 +1,7 @@
-import { app, dialog, Notification } from 'electron';
+import electronPkg from 'electron';
 import logPkg from 'electron-log';
 import pkg from 'electron-updater';
+const { app, dialog, Notification } = electronPkg;
 const { autoUpdater } = pkg;
 const log = logPkg;
 

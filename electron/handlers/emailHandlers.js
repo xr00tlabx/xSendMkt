@@ -1,5 +1,6 @@
-import { ipcMain } from 'electron';
+import pkg from 'electron';
 import EmailService from '../services/emailService.js';
+const { ipcMain } = pkg;
 
 export function setupEmailHandlers() {
     // Test SMTP connection

@@ -1,6 +1,7 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import pkg from 'electron';
 import path from 'path';
 import FileService from '../services/fileService.js';
+const { BrowserWindow, dialog, ipcMain } = pkg;
 
 export function setupFileHandlers(getMainWindow) {
     // Directory selection

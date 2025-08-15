@@ -1,7 +1,8 @@
-import { BrowserWindow } from 'electron';
+import pkg from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getPreloadPath, isDev } from '../utils/index.js';
+const { BrowserWindow } = pkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

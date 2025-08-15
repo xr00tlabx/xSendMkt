@@ -20,11 +20,11 @@ const SmtpConfigPage: React.FC = () => {
     const [bulkErrors, setBulkErrors] = useState<string[]>([]);
     const [bulkProcessing, setBulkProcessing] = useState(false);
 
-    // Advanced import settings
+    // Advanced import settings - OTIMIZADO para velocidade máxima
     const [bulkSettings, setBulkSettings] = useState({
-        threads: 3,
-        timeout: 15000,
-        retryPorts: [587, 465, 25, 2525]
+        threads: 8, // Mais threads para paralelização
+        timeout: 10000, // Timeout reduzido para ser mais rápido
+        retryPorts: [587, 465] // Apenas portas modernas, sem 25 e 2525
     });
 
     // Real-time progress tracking
@@ -34,6 +34,69 @@ const SmtpConfigPage: React.FC = () => {
         currentEmail: '',
         logs: [] as Array<{ time: string; message: string; type: 'info' | 'success' | 'error' | 'warning' }>
     });
+
+    // Configurações carregadas para otimização
+    const [appSettings, setAppSettings] = useState({
+        providerBlockList: [] as string[],
+        smtpSubdomains: [] as string[],
+        validSmtpConfigs: new Map<string, { host: string; port: number; secure: boolean }>()
+    });
+
+    // Carregar configurações do banco ao inicializar
+    React.useEffect(() => {
+        loadAppSettings();
+        loadValidSmtpConfigs();
+    }, []);
+
+    const loadAppSettings = async () => {
+        try {
+            const blockList = await window.electronAPI?.database?.getSetting('provider_block_list') || '';
+            const subdomains = await window.electronAPI?.database?.getSetting('smtp_subdomains') || '';
+
+            setAppSettings(prev => ({
+                ...prev,
+                providerBlockList: blockList.split('\n').map((s: string) => s.trim().toLowerCase()).filter(Boolean),
+                smtpSubdomains: subdomains.split('\n').map((s: string) => s.trim()).filter(Boolean)
+            }));
+        } catch (error) {
+            console.error('Erro ao carregar configurações:', error);
+        }
+    };
+
+    const loadValidSmtpConfigs = async () => {
+        try {
+            // Cache local básico para providers conhecidos (temporário)
+            const validConfigs = new Map<string, { host: string; port: number; secure: boolean }>();
+
+            // Adicionar configurações conhecidas dos providers mais comuns (fallback)
+            const fallbackConfigs = {
+                'uol.com.br': { host: 'smtp.uol.com.br', port: 587, secure: false },
+                'bol.com.br': { host: 'smtp.bol.com.br', port: 587, secure: false },
+                'terra.com.br': { host: 'smtp.terra.com.br', port: 587, secure: false },
+                'gmail.com': { host: 'smtp.gmail.com', port: 587, secure: false },
+                'outlook.com': { host: 'smtp-mail.outlook.com', port: 587, secure: false },
+                'hotmail.com': { host: 'smtp-mail.outlook.com', port: 587, secure: false },
+                'live.com': { host: 'smtp-mail.outlook.com', port: 587, secure: false },
+                'yahoo.com': { host: 'smtp.mail.yahoo.com', port: 587, secure: false },
+                'zoho.com': { host: 'smtp.zoho.com', port: 587, secure: false },
+                'icloud.com': { host: 'smtp.mail.me.com', port: 587, secure: false }
+            };
+
+            Object.entries(fallbackConfigs).forEach(([domain, config]) => {
+                validConfigs.set(domain, config);
+            });
+
+            setAppSettings(prev => ({
+                ...prev,
+                validSmtpConfigs: validConfigs
+            }));
+
+            addLog(`⚡ Cache SMTP básico inicializado com ${validConfigs.size} configurações`, 'success');
+        } catch (error) {
+            console.error('Erro ao carregar configurações SMTP válidas:', error);
+            addLog(`❌ Erro ao carregar cache SMTP: ${error}`, 'error');
+        }
+    };
 
     // Edit modal state
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -106,6 +169,34 @@ const SmtpConfigPage: React.FC = () => {
     };
 
     // Parse textarea lines with intelligent email/password extraction
+    // Função auxiliar para verificar se um domínio está na block list
+    const isEmailDomainBlocked = (email: string): boolean => {
+        const domain = email.split('@')[1]?.toLowerCase();
+        if (!domain) return false;
+
+        return appSettings.providerBlockList.includes(domain) ||
+            appSettings.providerBlockList.some(blocked => {
+                // Verificar subdomínios tradicionais (ex: mail.yahoo.com)
+                if (domain.endsWith('.' + blocked)) {
+                    return true;
+                }
+                // Verificar variações nacionais (ex: yahoo.com.mx -> yahoo.com)
+                const blockedBase = blocked.split('.')[0]; // 'yahoo' de 'yahoo.com'
+                const domainParts = domain.split('.');
+
+                if (domainParts[0] === blockedBase) {
+                    const lastPart = domainParts[domainParts.length - 1];
+                    const secondLastPart = domainParts[domainParts.length - 2];
+
+                    // Padrões como .com.mx, .co.uk, .com.br
+                    if (lastPart.length === 2 && secondLastPart === 'com') {
+                        return true;
+                    }
+                }
+                return false;
+            });
+    };
+
     const parseBulk = (text: string) => {
         const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
         const preview: Array<Omit<SmtpConfig, 'id'>> = [];
@@ -167,9 +258,17 @@ const SmtpConfigPage: React.FC = () => {
                     if (extraction.extracted && extraction.email && extraction.password) {
                         email = extraction.email;
                         password = extraction.password;
+
+                        // Verificar block list também para emails extraídos
+                        if (isEmailDomainBlocked(email)) {
+                            errors.push(`Linha ${idx + 1}: 🚫 Email extraído ${email} - provedor está na block list`);
+                            return;
+                        }
+
                         extracted.push({ email, password });
 
                         const domain = email.split('@')[1].toLowerCase();
+
                         host = `smtp.${domain}`;
                         port = 587;
                         secure = false;
@@ -177,6 +276,12 @@ const SmtpConfigPage: React.FC = () => {
                     } else {
                         // Mesmo se não conseguir extrair senha, guardar o email para possível teste
                         if (extraction.email) {
+                            // Verificar block list mesmo para emails sem senha
+                            if (isEmailDomainBlocked(extraction.email)) {
+                                errors.push(`Linha ${idx + 1}: 🚫 Email ${extraction.email} - provedor está na block list`);
+                                return;
+                            }
+
                             extracted.push({ email: extraction.email, password: extraction.password || '' });
                             errors.push(`Linha ${idx + 1}: formato inválido, mas email encontrado: ${extraction.email}`);
                         } else {
@@ -191,8 +296,14 @@ const SmtpConfigPage: React.FC = () => {
                     return;
                 }
 
+                // VERIFICAÇÃO DA BLOCK LIST no parseBulk
+                const domain = email.split('@')[1].toLowerCase();
+                if (isEmailDomainBlocked(email)) {
+                    errors.push(`Linha ${idx + 1}: 🚫 Provedor ${domain} está na block list - rejeitado`);
+                    return; // Não adicionar à preview
+                }
+
                 const local = email.split('@')[0];
-                const domain = email.split('@')[1];
 
                 preview.push({
                     name: `${local}@${domain} (auto-detectar)`,
@@ -412,8 +523,8 @@ const SmtpConfigPage: React.FC = () => {
         }
     };
 
-    // Função para validar configurações de email antes de testar SMTP
-    const validateEmailAndDomain = async (email: string): Promise<{ valid: boolean; domain?: string; error?: string }> => {
+    // Função para validar configurações de email antes de testar SMTP - OTIMIZADA
+    const validateEmailAndDomain = async (email: string): Promise<{ valid: boolean; domain?: string; error?: string; blocked?: boolean }> => {
         try {
             // Validar formato do email
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -421,11 +532,60 @@ const SmtpConfigPage: React.FC = () => {
                 return { valid: false, error: 'Formato de email inválido' };
             }
 
-            const domain = email.split('@')[1];
+            const domain = email.split('@')[1].toLowerCase();
 
             // Validar se o domínio não está vazio
             if (!domain) {
                 return { valid: false, error: 'Domínio não encontrado no email' };
+            }
+
+            // NOVA VALIDAÇÃO: Verificar block list de provedores
+            addLog(`🔍 Verificando domain '${domain}' contra block list (${appSettings.providerBlockList.length} itens)`, 'info');
+
+            // Debug: mostrar alguns itens da block list
+            if (appSettings.providerBlockList.length > 0) {
+                addLog(`📋 Block list inclui: ${appSettings.providerBlockList.slice(0, 3).join(', ')}...`, 'info');
+            } else {
+                addLog(`⚠️ Block list está vazia! Carregando configurações...`, 'warning');
+                await loadAppSettings(); // Tentar recarregar se estiver vazia
+            }
+
+            // Verificar se domínio ou domínio pai está na block list
+            const isBlocked = appSettings.providerBlockList.includes(domain) ||
+                appSettings.providerBlockList.some(blocked => {
+                    // Verificar subdomínios tradicionais (ex: mail.yahoo.com)
+                    if (domain.endsWith('.' + blocked)) {
+                        return true;
+                    }
+                    // Verificar variações nacionais (ex: yahoo.com.mx -> yahoo.com, gmail.com.br -> gmail.com)
+                    const blockedBase = blocked.split('.')[0]; // 'yahoo' de 'yahoo.com'
+                    const domainParts = domain.split('.');
+
+                    // Se o domínio começa com o mesmo nome base do bloqueado
+                    if (domainParts[0] === blockedBase) {
+                        // Verificar se é uma variação nacional (termina com código de país)
+                        const lastPart = domainParts[domainParts.length - 1];
+                        const secondLastPart = domainParts[domainParts.length - 2];
+
+                        // Padrões como .com.mx, .co.uk, .com.br
+                        if (lastPart.length === 2 && secondLastPart === 'com') {
+                            addLog(`🔍 Detectado variação nacional: ${domain} -> bloquear como ${blocked}`, 'info');
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+
+            if (isBlocked) {
+                addLog(`🚫 Provedor ${domain} está na block list - rejeitado`, 'warning');
+                return {
+                    valid: false,
+                    domain,
+                    blocked: true,
+                    error: `Provedor ${domain} está bloqueado (provedor gratuito na block list)`
+                };
+            } else {
+                addLog(`✅ Domínio ${domain} não está na block list - prosseguindo`, 'info');
             }
 
             // Lista de domínios problemáticos comuns que podem não ter SMTP configurado
@@ -434,32 +594,24 @@ const SmtpConfigPage: React.FC = () => {
                 'localhost', '127.0.0.1', 'invalid.com', 'fake.com'
             ];
 
-            if (problematicDomains.includes(domain.toLowerCase())) {
+            if (problematicDomains.includes(domain)) {
                 addLog(`⚠️ Domínio ${domain} está na lista de domínios problemáticos`, 'warning');
                 return { valid: false, error: `Domínio ${domain} é conhecido por não ter configuração SMTP válida` };
             }
 
-            // Validações específicas para domínios conhecidos
-            const knownFreeDomains = [
-                'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com',
-                'live.com', 'msn.com', 'icloud.com', 'aol.com'
-            ];
-
-            const isFreeDomain = knownFreeDomains.includes(domain.toLowerCase());
-            if (isFreeDomain) {
-                addLog(`📧 Detectado domínio gratuito ${domain} - usando configurações especiais`, 'info');
-                // Para domínios gratuitos, pular verificação de conectividade do domínio
-                // pois sabemos que funcionam, mas podem bloquear alguns tipos de requisição
+            // OTIMIZAÇÃO: Verificar configuração SMTP conhecida em cache local
+            if (appSettings.validSmtpConfigs.has(domain)) {
+                addLog(`⚡ Configuração SMTP para ${domain} encontrada em cache local`, 'success');
                 return { valid: true, domain };
             }
 
-            // Verificar se o domínio está online (apenas para domínios corporativos/personalizados)
+            // Para domínios corporativos/personalizados, verificar conectividade (mais leve)
             const domainCheck = await validateDomainOnline(domain);
             if (!domainCheck.online) {
                 return {
                     valid: false,
                     domain,
-                    error: `Domínio ${domain} parece estar offline: ${domainCheck.error}`
+                    error: `Domínio ${domain} parece estar offline: ${domainCheck.error}` 
                 };
             }
 
@@ -467,40 +619,79 @@ const SmtpConfigPage: React.FC = () => {
         } catch (error: any) {
             return { valid: false, error: error.message };
         }
-    };
-
-    const testSmtpWithRetries = async (email: string, password: string): Promise<{ success: boolean; config?: Omit<SmtpConfig, 'id'>; error?: string }> => {
+    }; const testSmtpWithRetries = async (email: string, password: string): Promise<{ success: boolean; config?: Omit<SmtpConfig, 'id'>; error?: string }> => {
         addLog(`🔍 Iniciando validação de ${email}...`, 'info');
 
         try {
-            // NOVA VALIDAÇÃO: Verificar email e domínio antes de testar SMTP
+            // NOVA VALIDAÇÃO: Verificar email e domínio (inclui block list)
             const validation = await validateEmailAndDomain(email);
             if (!validation.valid) {
-                addLog(`❌ Validação falhou para ${email}: ${validation.error}`, 'error');
+                if (validation.blocked) {
+                    addLog(`🚫 Email ${email} bloqueado (provedor na block list)`, 'error');
+                } else {
+                    addLog(`❌ Validação falhou para ${email}: ${validation.error}`, 'error');
+                }
                 return { success: false, error: validation.error };
             }
 
+            const domain = validation.domain!;
             addLog(`✅ Email e domínio validados para ${email}`, 'success');
-            addLog(`🔧 Iniciando testes SMTP para ${email}...`, 'info');
 
-            // Primeiro, tenta detectar configurações conhecidas
+            // OTIMIZAÇÃO: Verificar se já temos configuração válida em cache local
+            if (appSettings.validSmtpConfigs.has(domain)) {
+                const cachedConfig = appSettings.validSmtpConfigs.get(domain)!;
+                addLog(`⚡ Usando configuração em cache para ${domain}`, 'info');
+
+                const config: Omit<SmtpConfig, 'id'> = {
+                    name: `${domain} - ${email} (cache)`,
+                    host: cachedConfig.host,
+                    port: cachedConfig.port,
+                    secure: cachedConfig.secure,
+                    username: email,
+                    password,
+                    fromEmail: email,
+                    fromName: email.split('@')[0],
+                    isActive: true
+                };
+
+                // Testar a configuração em cache rapidamente
+                addLog(`🔧 Testando configuração em cache ${cachedConfig.host}:${cachedConfig.port}...`, 'info');
+                try {
+                    const test = await Promise.race([
+                        testConfig({ id: 'temp', ...config }),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Timeout')), bulkSettings.timeout)
+                        )
+                    ]) as any;
+
+                    if (test?.success) {
+                        addLog(`✅ Sucesso com configuração em cache ${cachedConfig.host}:${cachedConfig.port}`, 'success');
+                        return { success: true, config };
+                    }
+                } catch (error: any) {
+                    addLog(`⚠️ Cache falhou, tentando detecção automática: ${error.message}`, 'warning');
+                }
+            }
+
+            addLog(`🔧 Iniciando detecção automática para ${email}...`, 'info');
+
+            // Detectar configurações conhecidas (otimizado - apenas portas modernas)
             const detectedConfigs = await detectSmtpWithCustomSubdomains(email);
 
-            // Se não detectou nenhuma, cria configurações com as portas padrão
+            // Se não detectou nenhuma, cria configurações apenas com portas modernas
             if (detectedConfigs.length === 0) {
-                const domain = email.split('@')[1];
                 for (const port of bulkSettings.retryPorts) {
                     detectedConfigs.push({
                         host: `smtp.${domain}`,
                         port,
                         secure: port === 465,
                         detected: false,
-                        provider: `Custom-${port}`
+                        provider: `Auto-${port}`
                     });
                 }
             }
 
-            // Testa cada configuração
+            // Testar cada configuração (paralelizado quando possível)
             for (const detected of detectedConfigs) {
                 const config: Omit<SmtpConfig, 'id'> = {
                     name: `${detected.provider} - ${email}`,
@@ -526,6 +717,15 @@ const SmtpConfigPage: React.FC = () => {
 
                     if (test?.success) {
                         addLog(`✅ Sucesso com ${detected.host}:${detected.port}`, 'success');
+
+                        // OTIMIZAÇÃO: Salvar configuração válida em cache local para próximas vezes
+                        const cacheConfig = { host: detected.host, port: detected.port, secure: detected.secure };
+                        setAppSettings(prev => {
+                            const newValidConfigs = new Map(prev.validSmtpConfigs);
+                            newValidConfigs.set(domain, cacheConfig);
+                            return { ...prev, validSmtpConfigs: newValidConfigs };
+                        });
+
                         return { success: true, config };
                     }
                 } catch (error: any) {
@@ -581,6 +781,14 @@ const SmtpConfigPage: React.FC = () => {
                     }
 
                     const domain = cred.email.split('@')[1]?.toLowerCase() || '';
+
+                    // Verificar block list ANTES de criar o SMTP
+                    if (isEmailDomainBlocked(cred.email)) {
+                        fail++;
+                        addLog(`🚫 ${cred.email}: Provedor ${domain} está na block list - rejeitado`, 'warning');
+                        continue;
+                    }
+
                     const smtpHost = `smtp.${domain}`;
                     const key = `${smtpHost}|587|${cred.email.toLowerCase()}`;
 
