@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useEmailSender } from '../../hooks';
+import EmailListSelector from './EmailListSelector';
 import type { EmailCampaign, EmailList, EmailSendLog, SmtpConfig } from '../../types';
 
 interface FormData {
@@ -34,6 +35,7 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
     onSave
 }) => {
     const [activeTab, setActiveTab] = useState<'compose' | 'config' | 'logs'>('compose');
+    const [selectedLists, setSelectedLists] = useState<string[]>([]);
     const [formData, setFormData] = useState<FormData>({
         subject: '',
         sender: '',
@@ -60,12 +62,15 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
     } = useEmailSender();
 
     const activeSmtps = smtpConfigs.filter(smtp => smtp.isActive);
-    const totalEmails = lists.reduce((total, list) => total + list.emails.length, 0);
+    const selectedListData = lists.filter(list => selectedLists.includes(list.id));
+    const allSelectedEmails = selectedListData.flatMap(list => list.emails);
+    const uniqueEmails = [...new Set(allSelectedEmails)];
+    const totalEmails = uniqueEmails.length;
     const isValidToSend = canSend(
         { 
             id: 'temp',
             ...formData, 
-            selectedLists: [], 
+            selectedLists: selectedLists, 
             status: 'draft', 
             totalEmails, 
             sentEmails: 0, 
@@ -74,7 +79,7 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
             updatedAt: new Date()
         } as EmailCampaign,
         smtpConfigs,
-        lists
+        selectedListData
     );
 
     const handleStart = async () => {
@@ -83,7 +88,7 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
         // Salvar campanha primeiro
         const campaignData = {
             ...formData,
-            selectedLists: [],
+            selectedLists: selectedLists,
             status: 'draft' as const,
             totalEmails,
             sentEmails: 0,
@@ -167,6 +172,10 @@ const SimpleEmailSender: React.FC<SimpleEmailSenderProps> = ({
                         onStart={handleStart}
                         onPause={handlePause}
                         onStop={stopSending}
+                        lists={lists}
+                        selectedLists={selectedLists}
+                        onSelectionChange={setSelectedLists}
+                        totalEmails={totalEmails}
                     />
                 )}
                 
@@ -194,9 +203,31 @@ const ComposeTab: React.FC<{
     onStart: () => void;
     onPause: () => void;
     onStop: () => void;
-}> = ({ formData, setFormData, state, isValidToSend, onStart, onPause, onStop }) => {
+    lists: EmailList[];
+    selectedLists: string[];
+    onSelectionChange: (selected: string[]) => void;
+    totalEmails: number;
+}> = ({ formData, setFormData, state, isValidToSend, onStart, onPause, onStop, lists, selectedLists, onSelectionChange, totalEmails }) => {
     return (
         <div className="h-full flex flex-col p-6 space-y-6">
+            {/* Seleção de Listas de Email */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Destinatários</h3>
+                <EmailListSelector
+                    lists={lists}
+                    selectedLists={selectedLists}
+                    onSelectionChange={onSelectionChange}
+                    showStats={true}
+                />
+                {selectedLists.length === 0 && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                            ⚠️ Selecione pelo menos uma lista de emails para continuar
+                        </p>
+                    </div>
+                )}
+            </div>
+
             {/* Campos do Email */}
             <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Dados do Email</h3>
@@ -264,7 +295,12 @@ const ComposeTab: React.FC<{
                         
                         {!isValidToSend && (
                             <div className="text-sm text-gray-500">
-                                Preencha todos os campos para habilitar o envio
+                                {selectedLists.length === 0 
+                                    ? 'Selecione pelo menos uma lista de emails'
+                                    : totalEmails === 0
+                                    ? 'As listas selecionadas não possuem emails válidos'
+                                    : 'Preencha todos os campos para habilitar o envio'
+                                }
                             </div>
                         )}
                     </div>

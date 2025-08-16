@@ -8,6 +8,12 @@ on:
   schedule:
     - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC
 
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+  discussions: write
+
 jobs:
   issue-automation:
     name: 📋 Issue Management
@@ -88,7 +94,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { owner, repo, number } = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
             await github.rest.pulls.requestReviewers({
               owner,
               repo,
@@ -199,36 +206,18 @@ jobs:
               category_id: 'general'
             });
 
-  milestone-automation:
-    name: 🎯 Milestone Tracking
-    runs-on: ubuntu-latest
-    if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'opened')
-    steps:
-      - name: Update milestone progress
-        uses: actions/github-script@v6
-        with:
-          script: |
-            if (!context.payload.issue.milestone) return;
-            
-            const milestone = context.payload.issue.milestone;
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              milestone: milestone.number,
-              state: 'all'
-            });
-            
-            const total = issues.length;
-            const closed = issues.filter(issue => issue.state === 'closed').length;
-            const progress = Math.round((closed / total) * 100);
-            
-            // Update milestone description with progress
-            await github.rest.issues.updateMilestone({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              milestone_number: milestone.number,
-              description: `${milestone.description}\n\n📊 **Progress:** ${closed}/${total} issues (${progress}%)`
-            });
+  # milestone-automation:
+  #   name: 🎯 Milestone Tracking
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'opened')
+  #   steps:
+  #     - name: Update milestone progress
+  #       uses: actions/github-script@v6
+  #       with:
+  #         script: |
+  #           # Temporarily disabled due to permission issues
+  #           # Requires custom PAT with admin permissions
+  #           console.log('Milestone automation temporarily disabled');
 
   quality-gates:
     name: 🔍 Quality Automation
@@ -261,7 +250,8 @@ jobs:
         if: always()
         with:
           script: |
-            const { owner, repo, number } = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
             await github.rest.issues.createComment({
               owner,
               repo,
