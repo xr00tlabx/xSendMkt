@@ -1,0 +1,208 @@
+---
+name: 🤖 Copilot Coding Agent Implementation
+about: Pull request created by GitHub Copilot Coding Agent
+title: '🤖 [Copilot]: '
+labels: 'copilot-implementation'
+assignees: ''
+---
+
+## 🤖 GitHub Copilot Coding Agent Implementation
+
+### 📋 Summary
+<!-- Brief description of what was implemented -->
+
+
+### 🎯 Implementation Details
+
+#### Features Implemented
+- [ ] Core functionality
+- [ ] User interface components
+- [ ] Database operations
+- [ ] IPC communication
+- [ ] Error handling
+- [ ] Performance optimizations
+- [ ] Security measures
+- [ ] Testing coverage
+
+#### Technical Changes
+<!-- List the main technical changes made -->
+1. **Frontend Changes:**
+   - 
+   - 
+
+2. **Backend Changes:**
+   - 
+   - 
+
+3. **Database Changes:**
+   - 
+   - 
+
+### 📊 Performance Impact
+
+#### Performance Metrics
+<!-- Include performance measurements if applicable -->
+- **Memory Usage**: 
+- **Processing Time**: 
+- **Database Query Performance**: 
+- **UI Responsiveness**: 
+
+#### Optimization Techniques Used
+- [ ] React.memo for component optimization
+- [ ] useCallback for function memoization
+- [ ] useMemo for expensive calculations
+- [ ] Lazy loading for heavy components
+- [ ] Virtual scrolling for large lists
+- [ ] Batch processing for bulk operations
+- [ ] Database query optimization
+- [ ] Memory cleanup and garbage collection
+
+### 🔒 Security Considerations
+
+#### Security Measures Implemented
+- [ ] Input validation and sanitization
+- [ ] Secure data storage
+- [ ] Protection against injection attacks
+- [ ] Secure IPC communication
+- [ ] Proper error handling (no sensitive data exposure)
+- [ ] Authentication/authorization checks
+
+### 🧪 Testing
+
+#### Test Coverage
+- [ ] Unit tests written and passing
+- [ ] Integration tests implemented
+- [ ] E2E tests created
+- [ ] Performance tests included
+- [ ] Security tests added
+
+#### Test Results
+<!-- Paste test results or link to test runs -->
+```
+Test Results:
+✅ Unit Tests: X/X passing
+✅ Integration Tests: X/X passing  
+✅ E2E Tests: X/X passing
+✅ Performance Tests: Within targets
+```
+
+### 📚 Documentation
+
+#### Documentation Updates
+- [ ] Code comments (JSDoc) added
+- [ ] API documentation updated
+- [ ] User guide changes
+- [ ] Technical architecture docs
+- [ ] README updates
+- [ ] CHANGELOG entry
+
+### 🔧 Code Quality
+
+#### TypeScript Compliance
+- [ ] Strict mode compliance maintained
+- [ ] All interfaces properly typed
+- [ ] No `any` types used
+- [ ] Proper error type handling
+
+#### Code Standards
+- [ ] ESLint rules followed
+- [ ] Prettier formatting applied
+- [ ] File structure standards maintained
+- [ ] Naming conventions followed
+- [ ] Performance patterns implemented
+
+### 🔗 Dependencies
+
+#### New Dependencies Added
+<!-- List any new npm packages or dependencies -->
+- 
+- 
+
+#### Compatibility
+- [ ] Node.js 18+ compatibility maintained
+- [ ] Electron compatibility verified
+- [ ] React 18+ features used appropriately
+- [ ] TypeScript latest version support
+
+### 📱 UI/UX Changes
+
+#### Visual Changes
+<!-- Screenshots or descriptions of UI changes -->
+- 
+- 
+
+#### Accessibility
+- [ ] ARIA labels added where needed
+- [ ] Keyboard navigation support
+- [ ] Screen reader compatibility
+- [ ] Color contrast requirements met
+
+### 🚀 Deployment
+
+#### Build Status
+- [ ] Development build successful
+- [ ] Production build successful
+- [ ] Electron packaging tested
+- [ ] All platforms supported (Windows/Mac/Linux)
+
+#### Deployment Checklist
+- [ ] Environment variables updated
+- [ ] Database migrations included
+- [ ] Configuration files updated
+- [ ] Version number bumped appropriately
+
+### 🐛 Bug Fixes
+
+#### Issues Resolved
+<!-- List any bugs or issues this PR fixes -->
+- Fixes #
+- Resolves #
+- Closes #
+
+### ⚡ Performance Benchmarks
+
+#### Before vs After
+<!-- Performance comparison if applicable -->
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Processing Time | | | |
+| Memory Usage | | | |
+| Database Queries | | | |
+| UI Response Time | | | |
+
+### 🔍 Review Checklist
+
+#### For Reviewers
+- [ ] Code follows project conventions
+- [ ] Performance requirements met
+- [ ] Security measures adequate
+- [ ] Tests comprehensive and passing
+- [ ] Documentation complete and accurate
+- [ ] TypeScript types are strict and accurate
+- [ ] Error handling is robust
+- [ ] Memory leaks prevented
+- [ ] UI/UX matches design requirements
+
+### 🎯 Post-Merge Actions
+
+#### Follow-up Tasks
+- [ ] Monitor performance metrics
+- [ ] Update user documentation
+- [ ] Create release notes
+- [ ] Monitor error logs
+- [ ] Gather user feedback
+
+### 📈 Success Metrics
+
+#### How to Measure Success
+<!-- Define how the success of this implementation will be measured -->
+1. **Performance**: 
+2. **User Experience**: 
+3. **Stability**: 
+4. **Adoption**: 
+
+---
+
+**Generated by GitHub Copilot Coding Agent** 🤖
+
+This implementation follows the project's established patterns and performance optimization guidelines as defined in `.github/copilot-coding-agent.md`.
