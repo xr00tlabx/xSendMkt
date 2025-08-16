@@ -4,4 +4,5 @@ export { default as ImportEmailListModal } from './ImportEmailListModal';
 export { default as LoadSmtpsModal } from './LoadSmtpsModal';
 export { default as SettingsModal } from './SettingsModal';
 export { default as TestSmtpsModal } from './TestSmtpsModal';
+export { default as EnhancedBulkImportModal } from './EnhancedBulkImportModal';
 

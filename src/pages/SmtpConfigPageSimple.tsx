@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { useSmtpConfigs } from '../hooks';
 import type { SmtpConfig } from '../types';
 
-const SmtpConfigPage: React.FC = () => {
+const SmtpConfigPageSimple: React.FC = () => {
     const { configs, loading, updateConfig, createConfig, deleteConfig, testConfig, refetch } = useSmtpConfigs();
     const [showAddModal, setShowAddModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -380,4 +380,4 @@ mais@yahoo.com|senha789"
     );
 };
 
-export default SmtpConfigPage;
+export default SmtpConfigPageSimple;
