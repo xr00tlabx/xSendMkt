@@ -22,9 +22,12 @@ const SmtpConfigPage: React.FC = () => {
 
     // Advanced import settings - OTIMIZADO para velocidade máxima
     const [bulkSettings, setBulkSettings] = useState({
-        threads: 8, // Mais threads para paralelização
-        timeout: 10000, // Timeout reduzido para ser mais rápido
-        retryPorts: [587, 465] // Apenas portas modernas, sem 25 e 2525
+        threads: 16, // Aumentado para 16 threads para máxima paralelização
+        timeout: 8000, // Timeout reduzido para 8s para ser mais rápido
+        retryPorts: [587, 465], // Apenas portas modernas, sem 25 e 2525
+        domainValidationTimeout: 3000, // Timeout específico para validação de domínio
+        enableDomainCache: true, // Cache de validação de domínio
+        batchSize: 20 // Tamanho do lote para processamento
     });
 
     // Real-time progress tracking
@@ -39,7 +42,15 @@ const SmtpConfigPage: React.FC = () => {
     const [appSettings, setAppSettings] = useState({
         providerBlockList: [] as string[],
         smtpSubdomains: [] as string[],
-        validSmtpConfigs: new Map<string, { host: string; port: number; secure: boolean }>()
+        validSmtpConfigs: new Map<string, { host: string; port: number; secure: boolean }>(),
+        // NOVA: Cache de validação de domínio para evitar re-validações
+        domainValidationCache: new Map<string, { valid: boolean; timestamp: number; error?: string }>(),
+        // NOVA: Cache de estatísticas de performance
+        performanceStats: {
+            totalValidated: 0,
+            cacheHits: 0,
+            averageTimePerEmail: 0
+        }
     });
 
     // Carregar configurações do banco ao inicializar
@@ -381,6 +392,112 @@ const SmtpConfigPage: React.FC = () => {
     };
 
     // Função para validar se o domínio está online
+    // NOVA: Função otimizada para validação de domínio com cache
+    const validateDomainOptimized = async (domain: string): Promise<{ valid: boolean; error?: string; fromCache?: boolean }> => {
+        // Verificar cache primeiro
+        if (bulkSettings.enableDomainCache && appSettings.domainValidationCache.has(domain)) {
+            const cached = appSettings.domainValidationCache.get(domain)!;
+            const cacheAge = Date.now() - cached.timestamp;
+            
+            // Cache válido por 10 minutos
+            if (cacheAge < 10 * 60 * 1000) {
+                setAppSettings(prev => ({
+                    ...prev,
+                    performanceStats: {
+                        ...prev.performanceStats,
+                        cacheHits: prev.performanceStats.cacheHits + 1
+                    }
+                }));
+                return { valid: cached.valid, error: cached.error, fromCache: true };
+            }
+        }
+
+        // Lista de domínios problemáticos comuns
+        const problematicDomains = [
+            'example.com', 'test.com', 'demo.com', 'sample.com',
+            'localhost', '127.0.0.1', 'invalid.com', 'fake.com'
+        ];
+
+        if (problematicDomains.includes(domain)) {
+            const result = { valid: false, error: `Domínio ${domain} é conhecido por não ter configuração SMTP válida` };
+            
+            // Salvar no cache
+            if (bulkSettings.enableDomainCache) {
+                setAppSettings(prev => {
+                    const newCache = new Map(prev.domainValidationCache);
+                    newCache.set(domain, { ...result, timestamp: Date.now() });
+                    return { ...prev, domainValidationCache: newCache };
+                });
+            }
+            
+            return result;
+        }
+
+        // Para domínios conhecidos/grandes provedores, assumir que estão online
+        const knownGoodDomains = [
+            'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'live.com', 
+            'icloud.com', 'protonmail.com', 'zoho.com', 'aol.com', 'fastmail.com',
+            'uol.com.br', 'bol.com.br', 'terra.com.br', 'ig.com.br', 'globo.com'
+        ];
+
+        if (knownGoodDomains.includes(domain)) {
+            const result = { valid: true };
+            
+            // Salvar no cache
+            if (bulkSettings.enableDomainCache) {
+                setAppSettings(prev => {
+                    const newCache = new Map(prev.domainValidationCache);
+                    newCache.set(domain, { ...result, timestamp: Date.now() });
+                    return { ...prev, domainValidationCache: newCache };
+                });
+            }
+            
+            return result;
+        }
+
+        // Para outros domínios, fazer validação otimizada (apenas DNS)
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), bulkSettings.domainValidationTimeout);
+
+            await fetch(`https://${domain}`, {
+                method: 'HEAD',
+                mode: 'no-cors',
+                signal: controller.signal 
+            });
+            
+            clearTimeout(timeoutId);
+            
+            const result = { valid: true };
+            
+            // Salvar no cache
+            if (bulkSettings.enableDomainCache) {
+                setAppSettings(prev => {
+                    const newCache = new Map(prev.domainValidationCache);
+                    newCache.set(domain, { ...result, timestamp: Date.now() });
+                    return { ...prev, domainValidationCache: newCache };
+                });
+            }
+            
+            return result;
+        } catch (error: any) {
+            const result = { valid: false, error: `Domínio ${domain} parece estar offline: ${error.message}` };
+            
+            // Salvar no cache
+            if (bulkSettings.enableDomainCache) {
+                setAppSettings(prev => {
+                    const newCache = new Map(prev.domainValidationCache);
+                    newCache.set(domain, { ...result, timestamp: Date.now() });
+                    return { ...prev, domainValidationCache: newCache };
+                });
+            }
+            
+            return result;
+        }
+    };
+
+    // Legacy domain validation function (kept for backward compatibility)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const validateDomainOnline = async (domain: string): Promise<{ online: boolean; error?: string }> => {
         try {
             addLog(`🌐 Verificando conectividade do domínio ${domain}...`, 'info');
@@ -605,14 +722,25 @@ const SmtpConfigPage: React.FC = () => {
                 return { valid: true, domain };
             }
 
-            // Para domínios corporativos/personalizados, verificar conectividade (mais leve)
-            const domainCheck = await validateDomainOnline(domain);
-            if (!domainCheck.online) {
+            // Para domínios corporativos/personalizados, usar validação otimizada
+            const domainCheck = await validateDomainOptimized(domain);
+            if (!domainCheck.valid) {
+                if (domainCheck.fromCache) {
+                    addLog(`⚡ Domínio ${domain} rejeitado (cache): ${domainCheck.error}`, 'warning');
+                } else {
+                    addLog(`❌ Domínio ${domain} offline: ${domainCheck.error}`, 'error');
+                }
                 return {
                     valid: false,
                     domain,
-                    error: `Domínio ${domain} parece estar offline: ${domainCheck.error}` 
+                    error: domainCheck.error 
                 };
+            }
+
+            if (domainCheck.fromCache) {
+                addLog(`⚡ Domínio ${domain} validado via cache`, 'info');
+            } else {
+                addLog(`✅ Domínio ${domain} validado online`, 'success');
             }
 
             return { valid: true, domain };
@@ -654,13 +782,13 @@ const SmtpConfigPage: React.FC = () => {
                     isActive: true
                 };
 
-                // Testar a configuração em cache rapidamente
+                // Testar a configuração em cache rapidamente (timeout reduzido)
                 addLog(`🔧 Testando configuração em cache ${cachedConfig.host}:${cachedConfig.port}...`, 'info');
                 try {
                     const test = await Promise.race([
                         testConfig({ id: 'temp', ...config }),
                         new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Timeout')), bulkSettings.timeout)
+                            setTimeout(() => reject(new Error('Timeout')), bulkSettings.timeout / 2) // Timeout reduzido para cache
                         )
                     ]) as any;
 
@@ -669,7 +797,7 @@ const SmtpConfigPage: React.FC = () => {
                         return { success: true, config };
                     }
                 } catch (error: any) {
-                    addLog(`⚠️ Cache falhou, tentando detecção automática: ${error.message}`, 'warning');
+                    addLog(`⚠️ Cache falhou (timeout rápido), tentando detecção automática: ${error.message}`, 'warning');
                 }
             }
 
@@ -857,7 +985,8 @@ const SmtpConfigPage: React.FC = () => {
         });
 
         addLog(`🚀 Iniciando teste de ${bulkPreview.length} emails com ${bulkSettings.threads} threads`, 'info');
-        addLog(`⏱️ Timeout por teste: ${bulkSettings.timeout}ms`, 'info');
+        addLog(`⏱️ Timeout por teste: ${bulkSettings.timeout}ms | Domínio: ${bulkSettings.domainValidationTimeout}ms`, 'info');
+        addLog(`🔧 Lote: ${bulkSettings.batchSize} | Cache: ${bulkSettings.enableDomainCache ? 'ON' : 'OFF'}`, 'info');
 
         try {
             let ok = 0, fail = 0, dup = 0;
@@ -902,44 +1031,117 @@ const SmtpConfigPage: React.FC = () => {
                 }
             }
 
-            // Processa emails com auto-detecção em lotes paralelos
-            const batchSize = bulkSettings.threads;
-            for (let i = 0; i < emailsToProcess.length; i += batchSize) {
-                const batch = emailsToProcess.slice(i, i + batchSize);
-
-                const batchPromises = batch.map(async (cfg) => {
-                    setBulkProgress(prev => ({ ...prev, currentEmail: cfg.username }));
-
-                    const result = await testSmtpWithRetries(cfg.username, cfg.password);
-
-                    setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }));
-
-                    if (result.success && result.config) {
-                        const key = `${result.config.host}|${result.config.port}|${(result.config.username || '').toLowerCase()}`;
-
-                        if (!existing.has(key)) {
-                            await createConfig(result.config);
-                            existing.add(key);
-                            return { key, status: 'ok' as const, message: 'Conexão OK e salvo.' };
-                        } else {
-                            return { key, status: 'dup' as const, message: 'Duplicado. Ignorado.' };
-                        }
-                    } else {
-                        return { key: cfg.username, status: 'fail' as const, message: result.error || 'Falha na conexão' };
+            // NOVA OTIMIZAÇÃO: Agrupar emails por domínio para reduzir validações redundantes
+            const emailsByDomain = new Map<string, typeof emailsToProcess>();
+            for (const cfg of emailsToProcess) {
+                const domain = cfg.username?.split('@')[1]?.toLowerCase();
+                if (domain) {
+                    if (!emailsByDomain.has(domain)) {
+                        emailsByDomain.set(domain, []);
                     }
+                    emailsByDomain.get(domain)!.push(cfg);
+                }
+            }
+
+            addLog(`📊 ${emailsToProcess.length} emails agrupados em ${emailsByDomain.size} domínios únicos`, 'info');
+
+            // Processar por domínio para maximizar cache hits
+            const batchSize = bulkSettings.batchSize || bulkSettings.threads;
+            const domainKeys = Array.from(emailsByDomain.keys());
+            
+            for (let i = 0; i < domainKeys.length; i += batchSize) {
+                const domainBatch = domainKeys.slice(i, i + batchSize);
+                
+                const batchPromises = domainBatch.map(async (domain) => {
+                    const domainEmails = emailsByDomain.get(domain)!;
+                    const domainResults: Array<{ key: string; status: 'ok' | 'fail' | 'dup'; message?: string }> = [];
+                    
+                    // Validar domínio uma vez para todos os emails do domínio
+                    const domainValidation = await validateDomainOptimized(domain);
+                    
+                    if (!domainValidation.valid && !domainValidation.fromCache) {
+                        // Se domínio é inválido (e não está em cache), marcar todos os emails deste domínio como falha
+                        for (const cfg of domainEmails) {
+                            setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }));
+                            domainResults.push({
+                                key: cfg.username,
+                                status: 'fail',
+                                message: `Domínio inválido: ${domainValidation.error}`
+                            });
+                        }
+                        return domainResults;
+                    }
+
+                    // Processar emails do domínio em paralelo
+                    const emailPromises = domainEmails.map(async (cfg) => {
+                        setBulkProgress(prev => ({ ...prev, currentEmail: cfg.username }));
+
+                        const result = await testSmtpWithRetries(cfg.username, cfg.password);
+
+                        setBulkProgress(prev => ({ ...prev, current: prev.current + 1 }));
+
+                        if (result.success && result.config) {
+                            const key = `${result.config.host}|${result.config.port}|${(result.config.username || '').toLowerCase()}`;
+
+                            if (!existing.has(key)) {
+                                await createConfig(result.config);
+                                existing.add(key);
+                                return { key, status: 'ok' as const, message: 'Conexão OK e salvo.' };
+                            } else {
+                                return { key, status: 'dup' as const, message: 'Duplicado. Ignorado.' };
+                            }
+                        } else {
+                            return { key: cfg.username, status: 'fail' as const, message: result.error || 'Falha na conexão' };
+                        }
+                    });
+
+                    const emailResults = await Promise.all(emailPromises);
+                    domainResults.push(...emailResults);
+                    
+                    return domainResults;
                 });
 
                 const batchResults = await Promise.all(batchPromises);
-                batchResults.forEach(result => {
+                batchResults.flat().forEach(result => {
                     results.push(result);
                     if (result.status === 'ok') ok++;
                     else if (result.status === 'fail') fail++;
                     else if (result.status === 'dup') dup++;
                 });
+
+                // OTIMIZAÇÃO: Cleanup de memória após cada lote
+                if (global.gc) {
+                    global.gc();
+                }
             }
 
             await refetch();
+            
+            // OTIMIZAÇÃO: Calcular e exibir estatísticas de performance
+            const endTime = Date.now();
+            const totalTime = endTime - (bulkProgress.logs[0]?.time ? new Date(bulkProgress.logs[0].time).getTime() : endTime);
+            const totalEmails = ok + fail + dup;
+            const emailsPerSecond = totalEmails > 0 ? (totalEmails / (totalTime / 1000)).toFixed(1) : '0';
+            const cacheHitRate = appSettings.performanceStats.cacheHits > 0 ? 
+                ((appSettings.performanceStats.cacheHits / totalEmails) * 100).toFixed(1) : '0';
+
             addLog(`🎉 Importação concluída! ✅ ${ok} | ❌ ${fail} | 📋 ${dup}`, 'success');
+            addLog(`📊 Performance: ${emailsPerSecond} emails/seg | Cache: ${cacheHitRate}% | Tempo: ${(totalTime/1000).toFixed(1)}s`, 'info');
+            
+            // Atualizar estatísticas de performance
+            setAppSettings(prev => ({
+                ...prev,
+                performanceStats: {
+                    totalValidated: prev.performanceStats.totalValidated + totalEmails,
+                    cacheHits: prev.performanceStats.cacheHits,
+                    averageTimePerEmail: totalTime / totalEmails
+                }
+            }));
+
+            // OTIMIZAÇÃO: Cleanup de memória após processamento
+            if (global.gc) {
+                global.gc();
+            }
 
         } catch (e) {
             console.error(e);
@@ -1320,6 +1522,64 @@ const SmtpConfigPage: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {/* NEW: Performance Optimization Settings */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 bg-gradient-to-br from-green-500/8 to-blue-500/8 rounded-2xl border border-green-500/20 backdrop-blur-sm">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Rocket className="h-4 w-4 text-green-400" />
+                                                Tamanho do Lote
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="5"
+                                                max="50"
+                                                value={bulkSettings.batchSize}
+                                                onChange={(e) => setBulkSettings(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
+                                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-green-500/30 focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--vscode-input-background)',
+                                                    color: 'var(--vscode-text)'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <Database className="h-4 w-4 text-blue-400" />
+                                                Cache de Domínio (ms)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="1000"
+                                                max="10000"
+                                                step="500"
+                                                value={bulkSettings.domainValidationTimeout}
+                                                onChange={(e) => setBulkSettings(prev => ({ ...prev, domainValidationTimeout: Number(e.target.value) }))}
+                                                className="w-full px-4 py-2.5 text-sm rounded-xl border border-blue-500/30 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                                                style={{
+                                                    backgroundColor: 'var(--vscode-input-background)',
+                                                    color: 'var(--vscode-text)'
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-semibold flex items-center gap-2" style={{ color: 'var(--vscode-text)' }}>
+                                                <CheckCircle className="h-4 w-4 text-cyan-400" />
+                                                Otimizações
+                                            </label>
+                                            <div className="space-y-1">
+                                                <label className="flex items-center text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="mr-2" 
+                                                        checked={bulkSettings.enableDomainCache} 
+                                                        onChange={(e) => setBulkSettings(prev => ({ ...prev, enableDomainCache: e.target.checked }))} 
+                                                    />
+                                                    Cache de Domínio
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Email Input Section */}
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
@@ -1531,7 +1791,8 @@ Formatos suportados:
                                                 <Settings className="h-4 w-4 text-blue-400" />
                                                 <span>
                                                     {bulkSettings.threads} threads • {bulkSettings.timeout}ms timeout •
-                                                    {bulkSettings.retryPorts.length} portas configuradas
+                                                    {bulkSettings.retryPorts.length} portas • 
+                                                    Lote: {bulkSettings.batchSize} • Cache: {bulkSettings.enableDomainCache ? 'ON' : 'OFF'}
                                                 </span>
                                             </>
                                         )}
