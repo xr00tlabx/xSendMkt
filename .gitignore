@@ -13,6 +13,10 @@ dist-ssr
 dist-electron
 *.local
 
+# Lock files (for flexible dependency management)
+package-lock.json
+yarn.lock
+
 # Electron specific
 app/
 release/
