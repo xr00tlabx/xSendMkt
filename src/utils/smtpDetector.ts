@@ -350,7 +350,7 @@ export function clearSmtpDetectionCache(): void {
 }
 
 /**
- * Obtém estatísticas do cache de detecção SMTP
+ * Gets SMTP detection cache statistics
  */
 export function getSmtpCacheStats(): { size: number; hitRate: number } {
     return {
