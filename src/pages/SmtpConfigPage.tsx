@@ -22,12 +22,13 @@ const SmtpConfigPage: React.FC = () => {
 
     // Advanced import settings - OTIMIZADO para velocidade máxima
     const [bulkSettings, setBulkSettings] = useState({
-        threads: 16, // Aumentado para 16 threads para máxima paralelização
-        timeout: 8000, // Timeout reduzido para 8s para ser mais rápido
+        threads: 20, // Aumentado para 20 threads para máxima paralelização
+        timeout: 6000, // Timeout ainda mais reduzido para 6s para ser mais rápido
         retryPorts: [587, 465], // Apenas portas modernas, sem 25 e 2525
-        domainValidationTimeout: 3000, // Timeout específico para validação de domínio
+        domainValidationTimeout: 2000, // Timeout mais agressivo para validação de domínio (2s)
         enableDomainCache: true, // Cache de validação de domínio
-        batchSize: 20 // Tamanho do lote para processamento
+        batchSize: 30, // Tamanho do lote aumentado para 30
+        enableFastMode: true // Modo rápido que pula validações desnecessárias
     });
 
     // Real-time progress tracking
@@ -394,6 +395,29 @@ const SmtpConfigPage: React.FC = () => {
     // Função para validar se o domínio está online
     // NOVA: Função otimizada para validação de domínio com cache
     const validateDomainOptimized = async (domain: string): Promise<{ valid: boolean; error?: string; fromCache?: boolean }> => {
+        // FAST MODE: Para domínios conhecidos/grandes provedores, assumir que estão online sem validação
+        const knownGoodDomains = [
+            'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'live.com', 
+            'icloud.com', 'protonmail.com', 'zoho.com', 'aol.com', 'fastmail.com',
+            'uol.com.br', 'bol.com.br', 'terra.com.br', 'ig.com.br', 'globo.com',
+            'msn.com', 'ymail.com', 'googlemail.com', 'me.com', 'mac.com'
+        ];
+
+        if (bulkSettings.enableFastMode && knownGoodDomains.includes(domain)) {
+            const result = { valid: true, fromCache: true };
+            
+            // Salvar no cache sem validação real
+            if (bulkSettings.enableDomainCache) {
+                setAppSettings(prev => {
+                    const newCache = new Map(prev.domainValidationCache);
+                    newCache.set(domain, { ...result, timestamp: Date.now() });
+                    return { ...prev, domainValidationCache: newCache };
+                });
+            }
+            
+            return result;
+        }
+
         // Verificar cache primeiro
         if (bulkSettings.enableDomainCache && appSettings.domainValidationCache.has(domain)) {
             const cached = appSettings.domainValidationCache.get(domain)!;
@@ -412,7 +436,7 @@ const SmtpConfigPage: React.FC = () => {
             }
         }
 
-        // Lista de domínios problemáticos comuns
+        // Lista de domínios problemáticos comuns - rejeição imediata
         const problematicDomains = [
             'example.com', 'test.com', 'demo.com', 'sample.com',
             'localhost', '127.0.0.1', 'invalid.com', 'fake.com'
@@ -433,29 +457,7 @@ const SmtpConfigPage: React.FC = () => {
             return result;
         }
 
-        // Para domínios conhecidos/grandes provedores, assumir que estão online
-        const knownGoodDomains = [
-            'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com', 'live.com', 
-            'icloud.com', 'protonmail.com', 'zoho.com', 'aol.com', 'fastmail.com',
-            'uol.com.br', 'bol.com.br', 'terra.com.br', 'ig.com.br', 'globo.com'
-        ];
-
-        if (knownGoodDomains.includes(domain)) {
-            const result = { valid: true };
-            
-            // Salvar no cache
-            if (bulkSettings.enableDomainCache) {
-                setAppSettings(prev => {
-                    const newCache = new Map(prev.domainValidationCache);
-                    newCache.set(domain, { ...result, timestamp: Date.now() });
-                    return { ...prev, domainValidationCache: newCache };
-                });
-            }
-            
-            return result;
-        }
-
-        // Para outros domínios, fazer validação otimizada (apenas DNS)
+        // Para outros domínios, fazer validação muito leve (apenas DNS com timeout agressivo)
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), bulkSettings.domainValidationTimeout);
@@ -806,10 +808,19 @@ const SmtpConfigPage: React.FC = () => {
             // Detectar configurações conhecidas (otimizado - apenas portas modernas)
             const detectedConfigs = await detectSmtpWithCustomSubdomains(email);
 
+            // OTIMIZAÇÃO: Se modo rápido está ativo e temos cache de domínio, usar apenas primeira configuração
+            const configsToTest = bulkSettings.enableFastMode && appSettings.validSmtpConfigs.has(domain) 
+                ? detectedConfigs.slice(0, 1) // Testar apenas primeira configuração
+                : detectedConfigs;
+
             // Se não detectou nenhuma, cria configurações apenas com portas modernas
-            if (detectedConfigs.length === 0) {
-                for (const port of bulkSettings.retryPorts) {
-                    detectedConfigs.push({
+            if (configsToTest.length === 0) {
+                const portsToTry = bulkSettings.enableFastMode 
+                    ? [587] // Modo rápido: apenas porta 587
+                    : bulkSettings.retryPorts;
+                
+                for (const port of portsToTry) {
+                    configsToTest.push({
                         host: `smtp.${domain}`,
                         port,
                         secure: port === 465,
@@ -820,7 +831,7 @@ const SmtpConfigPage: React.FC = () => {
             }
 
             // Testar cada configuração (paralelizado quando possível)
-            for (const detected of detectedConfigs) {
+            for (const detected of configsToTest) {
                 const config: Omit<SmtpConfig, 'id'> = {
                     name: `${detected.provider} - ${email}`,
                     host: detected.host,
@@ -986,7 +997,7 @@ const SmtpConfigPage: React.FC = () => {
 
         addLog(`🚀 Iniciando teste de ${bulkPreview.length} emails com ${bulkSettings.threads} threads`, 'info');
         addLog(`⏱️ Timeout por teste: ${bulkSettings.timeout}ms | Domínio: ${bulkSettings.domainValidationTimeout}ms`, 'info');
-        addLog(`🔧 Lote: ${bulkSettings.batchSize} | Cache: ${bulkSettings.enableDomainCache ? 'ON' : 'OFF'}`, 'info');
+        addLog(`🔧 Lote: ${bulkSettings.batchSize} | Cache: ${bulkSettings.enableDomainCache ? 'ON' : 'OFF'} | Fast: ${bulkSettings.enableFastMode ? 'ON' : 'OFF'}`, 'info');
 
         try {
             let ok = 0, fail = 0, dup = 0;
@@ -1109,9 +1120,18 @@ const SmtpConfigPage: React.FC = () => {
                     else if (result.status === 'dup') dup++;
                 });
 
-                // OTIMIZAÇÃO: Cleanup de memória após cada lote
+                // OTIMIZAÇÃO: Cleanup de memória após cada lote + força GC
                 if (global.gc) {
                     global.gc();
+                }
+                
+                // OTIMIZAÇÃO: Limpar referências para objetos grandes
+                batchResults.length = 0;
+                
+                // OTIMIZAÇÃO: Throttle progress updates para reduzir overhead
+                if (i % 5 === 0 || i >= domainKeys.length - batchSize) {
+                    // Permitir UI updates apenas a cada 5 lotes ou no final
+                    await new Promise(resolve => setTimeout(resolve, 10));
                 }
             }
 
@@ -1576,6 +1596,15 @@ const SmtpConfigPage: React.FC = () => {
                                                     />
                                                     Cache de Domínio
                                                 </label>
+                                                <label className="flex items-center text-xs" style={{ color: 'var(--vscode-text-muted)' }}>
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="mr-2" 
+                                                        checked={bulkSettings.enableFastMode} 
+                                                        onChange={(e) => setBulkSettings(prev => ({ ...prev, enableFastMode: e.target.checked }))} 
+                                                    />
+                                                    Modo Rápido (pula validação)
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
@@ -1792,7 +1821,8 @@ Formatos suportados:
                                                 <span>
                                                     {bulkSettings.threads} threads • {bulkSettings.timeout}ms timeout •
                                                     {bulkSettings.retryPorts.length} portas • 
-                                                    Lote: {bulkSettings.batchSize} • Cache: {bulkSettings.enableDomainCache ? 'ON' : 'OFF'}
+                                                    Lote: {bulkSettings.batchSize} • Cache: {bulkSettings.enableDomainCache ? 'ON' : 'OFF'} • 
+                                                    Fast: {bulkSettings.enableFastMode ? 'ON' : 'OFF'}
                                                 </span>
                                             </>
                                         )}
