@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, FileText, Upload, X } from 'lucide-react';
 import React, { useRef, useState } from 'react';
+import EmailValidator from '../forms/EmailValidator';
 
 interface ImportEmailListModalProps {
     isOpen: boolean;

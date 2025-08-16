@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import EmailValidator from '../forms/EmailValidator';
 import type { EmailList } from '../../types';
 
 interface EmailListModalProps {
@@ -19,6 +20,8 @@ const EmailListModal: React.FC<EmailListModalProps> = ({
         name: '',
         emails: ''
     });
+    const [validEmails, setValidEmails] = useState<string[]>([]);
+    const [invalidEmails, setInvalidEmails] = useState<any[]>([]);
 
     useEffect(() => {
         if (editingList) {
@@ -31,20 +34,27 @@ const EmailListModal: React.FC<EmailListModalProps> = ({
         }
     }, [editingList]);
 
+    const handleValidationComplete = (valid: string[], invalid: any[]) => {
+        setValidEmails(valid);
+        setInvalidEmails(invalid);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        const emailList = formData.emails
-            .split('\n')
-            .map(email => email.trim())
-            .filter(email => email && email.includes('@'));
+        if (validEmails.length === 0) {
+            alert('Nenhum email válido encontrado. Verifique os endereços inseridos.');
+            return;
+        }
 
         onSave({
             name: formData.name,
-            emails: emailList
+            emails: validEmails
         });
 
         setFormData({ name: '', emails: '' });
+        setValidEmails([]);
+        setInvalidEmails([]);
         onClose();
     };
 
@@ -96,12 +106,26 @@ const EmailListModal: React.FC<EmailListModalProps> = ({
                         </p>
                     </div>
 
+                    {/* Email Validator */}
+                    {formData.emails.trim() && (
+                        <div className="border border-[var(--vscode-border)] rounded p-3">
+                            <EmailValidator
+                                emails={formData.emails.split('\n').filter(email => email.trim())}
+                                onValidationComplete={handleValidationComplete}
+                                showPreview={true}
+                                maxPreview={5}
+                            />
+                        </div>
+                    )}
+
                     <div className="flex space-x-2 pt-3">
                         <button
                             type="submit"
+                            disabled={validEmails.length === 0 && !!formData.emails.trim()}
                             className="btn-primary flex-1"
                         >
                             {editingList ? 'Atualizar Lista' : 'Criar Lista'}
+                            {validEmails.length > 0 && ` (${validEmails.length} emails)`}
                         </button>
                         <button
                             type="button"
