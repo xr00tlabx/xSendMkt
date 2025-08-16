@@ -88,7 +88,8 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const { owner, repo, number } = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
             await github.rest.pulls.requestReviewers({
               owner,
               repo,
@@ -261,7 +262,8 @@ jobs:
         if: always()
         with:
           script: |
-            const { owner, repo, number } = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const { number } = context.issue;
             await github.rest.issues.createComment({
               owner,
               repo,
