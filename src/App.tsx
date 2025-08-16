@@ -1,15 +1,12 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import InterfaceDemo from './components/InterfaceDemo';
 import ElectronLayout from './components/layout/ElectronLayout';
 import Layout from './components/layout/Layout';
 import ModalLayout from './components/layout/ModalLayout';
 import EmailListsPage from './pages/EmailListsPage';
-import HomePage from './pages/HomePage';
-import NewHomePageVSCode from './pages/NewHomePageVSCode';
-import UltraCompactHomePageVSCode from './pages/UltraCompactHomePageVSCode';
 import SettingsPage from './pages/SettingsPage';
 import SmtpConfigPage from './pages/SmtpConfigPage';
 import StatisticsPage from './pages/StatisticsPage';
+import HomePage from './pages/HomePage';
 
 function App() {
     // Check immediately if this is a modal window
@@ -65,10 +62,7 @@ function App() {
         <Router>
             <Routes>
                 <Route path="/" element={<ElectronLayout />}>
-                    <Route index element={<UltraCompactHomePageVSCode />} />
-                    <Route path="/home-vscode" element={<NewHomePageVSCode />} />
-                    <Route path="/home-old" element={<HomePage />} />
-                    <Route path="/demo" element={<InterfaceDemo />} />
+            <Route index element={<HomePage />} />
                 </Route>
                 <Route path="/modal" element={<Layout />}>
                     <Route path="email-lists" element={<EmailListsPage />} />
