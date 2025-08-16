@@ -1,23 +1,95 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+# 🤖 GitHub Copilot Instructions - xSendMkt Project
 
-# xSendMkt - Email Marketing System
+## 📋 Project Overview
+xSendMkt é um sistema profissional de marketing por email desenvolvido com Electron, React e TypeScript. O projeto foca em performance, usabilidade e recursos nativos desktop.
 
-This is a React TypeScript application with TailwindCSS for email marketing campaigns.
+## 🎯 Current Focus Areas
 
-## Architecture
+### 🚀 v1.1.0 - Electron Native Features (Current Sprint)
+**Priority Tasks:**
+1. **SMTP Bulk Import Optimization** - Melhorar performance de importação de 1000+ emails
+2. **Memory Leak Fixes** - Corrigir vazamentos durante envio sequencial
+3. **Domain Validation** - Implementar validação robusta de domínios
+4. **Native Menu System** - Menu nativo do Electron com shortcuts
 
-- **Frontend**: React with TypeScript, TailwindCSS, React Router
-- **API**: Mock API service with toggle to real API
-- **Components**: Modular component structure with layout, forms, and modals
-- **State Management**: React hooks and custom hooks for data fetching
+### 🏗️ Architecture Patterns
+- **Frontend:** React 18+ com TypeScript, Tailwind CSS, estilo VS Code
+- **Backend:** Electron Main Process com handlers modulares
+- **Database:** SQLite para dados locais, eventual cloud sync
+- **State Management:** React hooks customizados, Context API
+- **Testing:** Jest + Testing Library para frontend, electron-test para e2e
 
-## Key Features
+## 🔧 Development Guidelines
 
-- Email campaign creation with HTML editor (Monaco Editor)
-- Email list management with sidebar selection
-- SMTP server configuration with random selection
-- Real-time preview of email content
-- Campaign sending with pause/resume functionality
+### Code Style
+```typescript
+// ✅ Preferred patterns
+const useCustomHook = () => {
+  const [state, setState] = useState<Type>();
+  // Clear, typed state management
+};
+
+// Component naming: PascalCase
+const EmailSenderPanel: React.FC<Props> = ({ config }) => {
+  // JSX with proper typing
+};
+
+// File structure: feature-based organization
+src/
+  components/
+    email/         # Email-related components
+    layout/        # Layout components
+    modals/        # Modal components
+  hooks/           # Custom hooks
+  services/        # API and business logic
+  types/           # TypeScript definitions
+```
+
+### Performance Best Practices
+- **Lazy loading** para componentes pesados
+- **React.memo** para componentes que re-renderizam frequentemente
+- **useCallback/useMemo** para funções e computações caras
+- **Virtualization** para listas grandes de emails/SMTPs
+- **Web Workers** para operações CPU-intensivas
+
+### Electron Integration
+```typescript
+// ✅ Proper IPC communication
+window.electronAPI?.email?.sendBulkEmails(emails);
+
+// ✅ Type-safe preload script
+interface ElectronAPI {
+  email: {
+    sendBulkEmails: (emails: Email[]) => Promise<Result>;
+    testSmtpConfig: (config: SmtpConfig) => Promise<TestResult>;
+  };
+  database: {
+    saveConfig: (config: any) => Promise<void>;
+    getSettings: () => Promise<Settings>;
+  };
+}
+```
+
+## 🎨 UI/UX Patterns
+
+### VS Code Theme Integration
+```css
+/* ✅ Use CSS variables for theme consistency */
+.vscode-panel {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-border);
+  color: var(--vscode-text);
+}
+```
+
+## 📊 Project Management Integration
+
+### Issue Creation
+Quando sugerir melhorias, sempre considere:
+- **Milestone apropriado** (v1.1.0, v1.2.0, etc.)
+- **Story points** estimados (1, 2, 3, 5, 8)
+- **Labels corretos** (bug, enhancement, task, etc.)
+- **Prioridade** baseada no impact/urgency
 - Statistics and analytics dashboard
 - API mock toggle for development/production
 

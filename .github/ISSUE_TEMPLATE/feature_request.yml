@@ -1,0 +1,87 @@
+name: 🚀 Nova Feature
+description: Sugerir uma nova funcionalidade para o xSendMkt
+title: '[FEATURE] '
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por sugerir uma nova funcionalidade! Preencha os campos abaixo para nos ajudar a entender melhor sua proposta.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 🎯 Resumo da Feature
+      description: Descreva brevemente a funcionalidade que você gostaria de ver implementada
+      placeholder: Ex: Adicionar suporte a templates de email predefinidos
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: 💡 Motivação
+      description: Por que esta feature é importante? Que problema ela resolve?
+      placeholder: Ex: Atualmente é muito demorado criar emails do zero...
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 📋 Descrição Detalhada
+      description: Descreva em detalhes como a feature deveria funcionar
+    validations:
+      required: true
+
+  - type: textarea
+    id: ui_ux
+    attributes:
+      label: 🎨 Interface/UX
+      description: Como deveria aparecer na interface? Anexe mockups se possível
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: ✅ Critérios de Aceitação
+      description: Liste os critérios que devem ser atendidos para considerar a feature completa
+      placeholder: |
+        - [ ] Usuário pode criar novo template
+        - [ ] Usuário pode editar template existente
+        - [ ] Templates aparecem na lista principal
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 🏷️ Prioridade
+      description: Qual a prioridade desta feature?
+      options:
+        - 🔥 Alta (crítica para o próximo release)
+        - 🟡 Média (importante mas não urgente)
+        - 🟢 Baixa (nice to have)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: 📊 Estimativa de Esforço
+      description: Qual o tamanho estimado desta feature?
+      options:
+        - 🟢 Pequena (1-2 dias)
+        - 🟡 Média (3-5 dias)
+        - 🔴 Grande (1-2 semanas)
+        - 🟣 Extra Grande (2+ semanas)
+
+  - type: input
+    id: milestone
+    attributes:
+      label: 🏗️ Milestone Sugerido
+      description: Em qual versão/milestone esta feature deveria ser incluída?
+      placeholder: Ex: v1.2.0
+
+  - type: textarea
+    id: related_resources
+    attributes:
+      label: 🔗 Recursos Relacionados
+      description: Links para documentação, outras issues, etc.

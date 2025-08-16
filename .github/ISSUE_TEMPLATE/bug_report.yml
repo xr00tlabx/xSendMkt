@@ -1,0 +1,95 @@
+name: 🐛 Bug Report
+description: Reportar um problema ou bug no xSendMkt
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar um bug! Suas informações nos ajudam a melhorar o xSendMkt.
+
+  - type: textarea
+    id: bug_description
+    attributes:
+      label: 🐛 Descrição do Bug
+      description: Descreva claramente o que está acontecendo
+      placeholder: Ex - O botão de enviar email não funciona quando...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps_to_reproduce
+    attributes:
+      label: 🔄 Passos para Reproduzir
+      description: Como podemos reproduzir este bug?
+      placeholder: |
+        1. Vá para '...'
+        2. Clique em '...'
+        3. Role para baixo até '...'
+        4. Veja o erro
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: ✅ Comportamento Esperado
+      description: O que deveria acontecer?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual_behavior
+    attributes:
+      label: ❌ Comportamento Atual
+      description: O que está acontecendo na verdade?
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 Screenshots
+      description: Se aplicável, adicione screenshots para explicar o problema
+
+  - type: dropdown
+    id: operating_system
+    attributes:
+      label: 💻 Sistema Operacional
+      options:
+        - Windows 10
+        - Windows 11
+        - macOS
+        - Linux (Ubuntu)
+        - Linux (Other)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: 📱 Versão do xSendMkt
+      description: Qual versão você está usando?
+      placeholder: Ex - v1.0.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: 🚨 Severidade
+      description: Quão crítico é este bug?
+      options:
+        - 🔥 Crítico (aplicação não funciona)
+        - 🔴 Alto (funcionalidade principal quebrada)
+        - 🟡 Médio (funcionalidade secundária quebrada)
+        - 🟢 Baixo (problema cosmético)
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: 📝 Contexto Adicional
+      description: Qualquer outra informação relevante sobre o problema

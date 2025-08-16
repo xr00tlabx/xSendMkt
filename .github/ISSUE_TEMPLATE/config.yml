@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussões
+    url: https://github.com/xr00tlabx/xSendMkt/discussions
+    about: Para perguntas gerais, ideias e discussões sobre o projeto
+  - name: 📖 Documentação
+    url: https://github.com/xr00tlabx/xSendMkt/wiki
+    about: Acesse a documentação completa do projeto

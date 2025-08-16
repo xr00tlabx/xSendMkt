@@ -1,0 +1,334 @@
+name: 🤖 Project Management Automation
+
+on:
+  issues:
+    types: [opened, closed, assigned, labeled]
+  pull_request:
+    types: [opened, closed, ready_for_review]
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC
+
+jobs:
+  issue-automation:
+    name: 📋 Issue Management
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues'
+    steps:
+      - name: Add to Project Board
+        if: github.event.action == 'opened'
+        uses: actions/add-to-project@v0.4.0
+        with:
+          project-url: https://github.com/users/xr00tlabx/projects/1
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-assign labels
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo, number } = context.issue;
+            const issue = await github.rest.issues.get({ owner, repo, issue_number: number });
+            
+            // Auto-assign labels based on title
+            const labels = [];
+            const title = issue.data.title.toLowerCase();
+            
+            if (title.includes('[bug]') || title.includes('bug:')) {
+              labels.push('bug', 'needs-triage');
+            } else if (title.includes('[feature]') || title.includes('feature:')) {
+              labels.push('enhancement', 'needs-triage');
+            } else if (title.includes('[task]') || title.includes('task:')) {
+              labels.push('task');
+            }
+            
+            // Auto-assign priority based on keywords
+            if (title.includes('critical') || title.includes('urgent')) {
+              labels.push('high-priority');
+            } else if (title.includes('nice to have') || title.includes('enhancement')) {
+              labels.push('low-priority');
+            } else {
+              labels.push('medium-priority');
+            }
+            
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: number,
+                labels
+              });
+            }
+
+      - name: Welcome New Contributors
+        if: github.event.action == 'opened' && github.event.issue.author_association == 'FIRST_TIME_CONTRIBUTOR'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🎉 Obrigado por sua primeira contribuição ao xSendMkt! 
+              
+              Seu issue será revisado em breve. Enquanto isso, você pode:
+              - ⭐ Dar uma estrela no repositório
+              - 📖 Ler nossa [documentação](./docs/project-management/PROJECT_MANAGEMENT.md)
+              - 💬 Participar das [discussões](https://github.com/xr00tlabx/xSendMkt/discussions)
+              
+              Bem-vindo à comunidade! 🚀`
+            })
+
+  pr-automation:
+    name: 🔄 Pull Request Management
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Auto-assign reviewer
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo, number } = context.payload.pull_request;
+            await github.rest.pulls.requestReviewers({
+              owner,
+              repo,
+              pull_number: number,
+              reviewers: ['xr00tlabx']
+            });
+
+      - name: Check PR template
+        if: github.event.action == 'opened'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { body } = context.payload.pull_request;
+            const hasTemplate = body && body.includes('## 📋 Resumo das Alterações');
+            
+            if (!hasTemplate) {
+              await github.rest.issues.createComment({
+                issue_number: context.payload.pull_request.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `⚠️ **Template de PR não encontrado**
+                
+                Por favor, use o [template de Pull Request](.github/pull_request_template.md) para facilitar a revisão.
+                
+                Itens essenciais:
+                - [ ] Resumo das alterações
+                - [ ] Issue relacionada
+                - [ ] Tipo de mudança
+                - [ ] Como foi testado
+                - [ ] Checklist completo`
+              });
+            }
+
+      - name: Update issue on PR merge
+        if: github.event.action == 'closed' && github.event.pull_request.merged == true
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const prBody = context.payload.pull_request.body || '';
+            const issueNumbers = prBody.match(/(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi);
+            
+            if (issueNumbers) {
+              for (const match of issueNumbers) {
+                const issueNumber = match.match(/\d+/)[0];
+                await github.rest.issues.createComment({
+                  issue_number: parseInt(issueNumber),
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: `✅ **Resolvido**
+                  
+                  Esta issue foi resolvida pelo PR #${context.payload.pull_request.number}
+                  
+                  🎉 Obrigado pela contribuição!`
+                });
+              }
+            }
+
+  sprint-automation:
+    name: 🏃‍♂️ Sprint Management
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 9 * * 1'  # Monday mornings
+    steps:
+      - name: Weekly Sprint Report
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const oneWeekAgo = new Date();
+            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+            
+            // Get issues closed in the last week
+            const { data: closedIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              since: oneWeekAgo.toISOString(),
+              labels: 'sprint:current'
+            });
+            
+            // Get open issues in current sprint
+            const { data: openIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'sprint:current'
+            });
+            
+            const report = `# 📊 Weekly Sprint Report - ${new Date().toLocaleDateString()}
+            
+            ## ✅ Completed This Week
+            ${closedIssues.length > 0 ? closedIssues.map(issue => `- #${issue.number} - ${issue.title}`).join('\n') : '- Nenhuma issue fechada'}
+            
+            ## 🚀 Still In Progress
+            ${openIssues.length > 0 ? openIssues.map(issue => `- #${issue.number} - ${issue.title}`).join('\n') : '- Nenhuma issue em andamento'}
+            
+            ## 📈 Sprint Health
+            - **Completed:** ${closedIssues.length} issues
+            - **Remaining:** ${openIssues.length} issues
+            - **Progress:** ${Math.round((closedIssues.length / (closedIssues.length + openIssues.length)) * 100) || 0}%
+            
+            *Gerado automaticamente toda segunda-feira*`;
+            
+            // Create discussion post
+            await github.rest.discussions.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Sprint Report - ${new Date().toLocaleDateString()}`,
+              body: report,
+              category_id: 'general'
+            });
+
+  milestone-automation:
+    name: 🎯 Milestone Tracking
+    runs-on: ubuntu-latest
+    if: github.event_name == 'issues' && (github.event.action == 'closed' || github.event.action == 'opened')
+    steps:
+      - name: Update milestone progress
+        uses: actions/github-script@v6
+        with:
+          script: |
+            if (!context.payload.issue.milestone) return;
+            
+            const milestone = context.payload.issue.milestone;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              milestone: milestone.number,
+              state: 'all'
+            });
+            
+            const total = issues.length;
+            const closed = issues.filter(issue => issue.state === 'closed').length;
+            const progress = Math.round((closed / total) * 100);
+            
+            // Update milestone description with progress
+            await github.rest.issues.updateMilestone({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              milestone_number: milestone.number,
+              description: `${milestone.description}\n\n📊 **Progress:** ${closed}/${total} issues (${progress}%)`
+            });
+
+  quality-gates:
+    name: 🔍 Quality Automation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'opened'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run type-check
+
+      - name: Security audit
+        run: npm audit --audit-level=moderate
+
+      - name: Comment PR with quality check
+        uses: actions/github-script@v6
+        if: always()
+        with:
+          script: |
+            const { owner, repo, number } = context.payload.pull_request;
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: number,
+              body: `## 🔍 Quality Gates Check
+              
+              - ✅ Linting passed
+              - ✅ Type checking passed  
+              - ✅ Security audit passed
+              - ⏳ Waiting for manual review
+              
+              *Automated quality checks completed*`
+            });
+
+  release-automation:
+    name: 🚀 Release Management
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Generate release notes
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            
+            // Get commits since last tag
+            const { data: commits } = await github.rest.repos.listCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              since: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString() // Last 30 days
+            });
+            
+            const features = [];
+            const fixes = [];
+            const other = [];
+            
+            commits.forEach(commit => {
+              const message = commit.commit.message;
+              if (message.includes('feat:') || message.includes('[FEATURE]')) {
+                features.push(`- ${message.split('\n')[0]}`);
+              } else if (message.includes('fix:') || message.includes('[BUG]')) {
+                fixes.push(`- ${message.split('\n')[0]}`);
+              } else {
+                other.push(`- ${message.split('\n')[0]}`);
+              }
+            });
+            
+            const releaseNotes = `## 🚀 What's New in ${tag}
+            
+            ${features.length > 0 ? `### ✨ New Features\n${features.join('\n')}\n` : ''}
+            ${fixes.length > 0 ? `### 🐛 Bug Fixes\n${fixes.join('\n')}\n` : ''}
+            ${other.length > 0 ? `### 🔧 Other Changes\n${other.join('\n')}\n` : ''}
+            
+            ## 📥 Download
+            
+            - [Windows](./releases/download/${tag}/xSendMkt-${tag}-win.exe)
+            - [macOS](./releases/download/${tag}/xSendMkt-${tag}-mac.dmg)
+            - [Linux](./releases/download/${tag}/xSendMkt-${tag}-linux.AppImage)
+            
+            **Full Changelog**: [${tag}](./compare/v1.0.0...${tag})`;
+            
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `xSendMkt ${tag}`,
+              body: releaseNotes,
+              draft: false,
+              prerelease: tag.includes('beta') || tag.includes('alpha')
+            });

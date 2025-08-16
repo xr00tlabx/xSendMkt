@@ -1,0 +1,85 @@
+name: ⚡ Task/Improvement
+description: Melhorias, refatorações e tarefas de desenvolvimento
+title: "[TASK] "
+labels: ["task", "improvement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use este template para tarefas de desenvolvimento, melhorias de código, refatorações e otimizações.
+
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: 🏷️ Tipo de Tarefa
+      options:
+        - 🔧 Refatoração
+        - ⚡ Otimização de Performance
+        - 📚 Documentação
+        - 🧪 Testes
+        - 🎨 UI/UX Improvements
+        - 🔒 Segurança
+        - 🔄 DevOps/CI-CD
+        - 🧹 Limpeza de Código
+        - 📦 Dependências
+        - 🌐 Integração
+    validations:
+      required: true
+
+  - type: textarea
+    id: task_description
+    attributes:
+      label: 📝 Descrição da Tarefa
+      description: Descreva o que precisa ser feito
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_details
+    attributes:
+      label: 🔧 Detalhes Técnicos
+      description: Especificações técnicas, arquivos envolvidos, etc.
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: ✅ Critérios de Aceitação
+      description: Como saberemos que a tarefa foi concluída?
+      placeholder: |
+        - [ ] Código refatorado está funcionando
+        - [ ] Testes passando
+        - [ ] Documentação atualizada
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 🔥 Prioridade
+      options:
+        - 🔥 Alta
+        - 🟡 Média
+        - 🟢 Baixa
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: ⏱️ Estimativa
+      options:
+        - 🟢 1-2 horas
+        - 🟡 Meio dia
+        - 🔴 1-2 dias
+        - 🟣 3+ dias
+
+  - type: input
+    id: files_affected
+    attributes:
+      label: 📁 Arquivos Afetados
+      description: Liste os principais arquivos que serão modificados
+      placeholder: Ex - src/components/EmailEditor.tsx, src/services/emailService.ts
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: 🔗 Dependências
+      description: Esta tarefa depende de outras issues/PRs?
