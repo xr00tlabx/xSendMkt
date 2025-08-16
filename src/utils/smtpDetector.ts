@@ -157,7 +157,7 @@ export interface SmtpDetectionResult {
 
 // Cache para resultados de detecção SMTP
 const smtpDetectionCache = new Map<string, CachedResult>();
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutos
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 interface CachedResult {
     result: SmtpDetectionResult;
@@ -350,7 +350,7 @@ export function clearSmtpDetectionCache(): void {
 }
 
 /**
- * Obtém estatísticas do cache de detecção SMTP
+ * Gets SMTP detection cache statistics
  */
 export function getSmtpCacheStats(): { size: number; hitRate: number } {
     return {
