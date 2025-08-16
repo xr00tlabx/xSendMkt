@@ -1,14 +1,16 @@
 import {
-    CheckCircle, Edit, Loader2, Mail, Plus, Server, TestTube, Trash2, Upload, X
+  Edit, Loader2, Mail, Plus, TestTube, Trash2, Upload, Zap
 } from 'lucide-react';
 import React, { useState } from 'react';
+import { SimpleEmailImportModal } from '../components/modals';
 import { useSmtpConfigs } from '../hooks';
 import type { SmtpConfig } from '../types';
 
 const SmtpConfigPage: React.FC = () => {
-    const { configs, loading, updateConfig, createConfig, deleteConfig, testConfig, refetch } = useSmtpConfigs();
+  const { configs, loading, createConfig, deleteConfig, testConfig, refetch } = useSmtpConfigs();
     const [showAddModal, setShowAddModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+  const [showSimpleImportModal, setShowSimpleImportModal] = useState(false);
     const [testingId, setTestingId] = useState<string | null>(null);
 
     // Simple Add Modal State
@@ -125,6 +127,53 @@ const SmtpConfigPage: React.FC = () => {
         alert(`✅ Importação concluída!\n${success} adicionados, ${failed} falharam`);
     };
 
+  const handleSimpleImport = async (data: {
+    name: string;
+    emails: string[];
+    validSmtps: SmtpConfig[];
+    chunkSize: number;
+  }) => {
+    try {
+      // Importar as configurações SMTP detectadas
+      let imported = 0;
+      for (const smtpConfig of data.validSmtps) {
+        try {
+          await createConfig(smtpConfig);
+          imported++;
+        } catch (error) {
+          console.error('Erro ao criar config SMTP:', error);
+        }
+      }
+
+      // Também salvar os emails como lista se necessário
+      if (data.emails.length > 0) {
+        try {
+          await window.electronAPI?.files?.saveEmailListChunked(
+            data.name,
+            data.emails.map(email => ({ email, name: email.split('@')[0] })),
+            data.chunkSize,
+            'txt'
+          );
+        } catch (error) {
+          console.error('Erro ao salvar emails:', error);
+        }
+      }
+
+      setShowSimpleImportModal(false);
+      refetch();
+
+      alert(
+        `✅ Importação inteligente concluída!\n` +
+        `📧 ${data.emails.length} emails processados\n` +
+        `🔧 ${imported} configurações SMTP adicionadas\n` +
+        `📁 Lista "${data.name}" salva`
+      );
+    } catch (error) {
+      console.error('Erro na importação:', error);
+      alert('Erro ao importar dados. Verifique o console para mais detalhes.');
+    }
+  };
+
     return (
         <div className="flex-1 p-6 vscode-page">
             {/* Header */}
@@ -146,6 +195,13 @@ const SmtpConfigPage: React.FC = () => {
                         Importar Vários
                     </button>
                     <button 
+              className="bg-[var(--vscode-button-background)] hover:bg-[var(--vscode-button-hoverBackground)] text-[var(--vscode-button-foreground)] px-4 py-2 rounded transition-colors flex items-center"
+              onClick={() => setShowSimpleImportModal(true)}
+            >
+              <Zap className="h-4 w-4 mr-2" />
+              Importação Inteligente
+            </button>
+            <button 
                         className="btn-primary"
                         onClick={() => setShowAddModal(true)}
                     >
@@ -376,6 +432,13 @@ mais@yahoo.com|senha789"
                     </div>
                 </div>
             )}
+
+        {/* Simple Email Import Modal */}
+        <SimpleEmailImportModal
+          isOpen={showSimpleImportModal}
+          onClose={() => setShowSimpleImportModal(false)}
+          onImport={handleSimpleImport}
+        />
         </div>
     );
 };

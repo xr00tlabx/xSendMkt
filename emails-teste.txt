@@ -1,0 +1,6 @@
+admin@empresa.com
+contato@site.com.br
+vendas@loja.com
+suporte@exemplo.com
+user@gmail.com
+test@outlook.com
