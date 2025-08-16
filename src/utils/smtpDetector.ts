@@ -155,8 +155,17 @@ export interface SmtpDetectionResult {
     provider?: string;
 }
 
+// Cache para resultados de detecção SMTP
+const smtpDetectionCache = new Map<string, CachedResult>();
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutos
+
+interface CachedResult {
+    result: SmtpDetectionResult;
+    timestamp: number;
+}
+
 /**
- * Detecta configurações SMTP baseado no domínio do email
+ * Detecta configurações SMTP baseado no domínio do email com cache inteligente
  */
 export function detectSmtpFromEmail(email: string): SmtpDetectionResult {
     const domain = email.split('@')[1]?.toLowerCase();
@@ -170,21 +179,43 @@ export function detectSmtpFromEmail(email: string): SmtpDetectionResult {
         };
     }
 
-    // Procura por provedores conhecidos
+    // Verifica cache primeiro
+    const cached = smtpDetectionCache.get(domain);
+    if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+        return { ...cached.result }; // Clone para evitar mutação
+    }
+
+    // Procura por provedores conhecidos com prioridade otimizada
     for (const provider of SMTP_PROVIDERS) {
         if (provider.domains.includes(domain)) {
-            return {
+            const result: SmtpDetectionResult = {
                 host: provider.host,
                 port: provider.port,
                 secure: provider.secure,
                 detected: true,
                 provider: domain
             };
+            
+            // Cache o resultado
+            smtpDetectionCache.set(domain, {
+                result: { ...result },
+                timestamp: Date.now()
+            });
+            
+            return result;
         }
     }
 
     // Se não encontrou um provedor conhecido, tenta deduzir baseado no domínio
-    return detectSmtpFromDomain(domain);
+    const result = detectSmtpFromDomain(domain);
+    
+    // Cache o resultado mesmo para domínios não conhecidos
+    smtpDetectionCache.set(domain, {
+        result: { ...result },
+        timestamp: Date.now()
+    });
+    
+    return result;
 }
 
 /**
@@ -309,4 +340,157 @@ export async function detectSmtpWithCustomSubdomains(email: string): Promise<Smt
     }
 
     return results;
+}
+
+/**
+ * Limpa o cache de detecção SMTP
+ */
+export function clearSmtpDetectionCache(): void {
+    smtpDetectionCache.clear();
+}
+
+/**
+ * Obtém estatísticas do cache de detecção SMTP
+ */
+export function getSmtpCacheStats(): { size: number; hitRate: number } {
+    return {
+        size: smtpDetectionCache.size,
+        hitRate: 0 // Implementar tracking de hit rate se necessário
+    };
+}
+
+/**
+ * Detecta o provedor de email mais comum em uma lista de emails
+ */
+export function detectMostCommonProvider(emails: string[]): { provider: string; count: number; percentage: number } | null {
+    const providerCounts = new Map<string, number>();
+    
+    emails.forEach(email => {
+        const emailDomain = extractDomain(email);
+        const detection = detectSmtpFromEmail(email);
+        
+        if (detection.detected && detection.provider) {
+            const current = providerCounts.get(detection.provider) || 0;
+            providerCounts.set(detection.provider, current + 1);
+        }
+    });
+    
+    if (providerCounts.size === 0) return null;
+    
+    let mostCommon = { provider: '', count: 0 };
+    for (const [provider, count] of providerCounts.entries()) {
+        if (count > mostCommon.count) {
+            mostCommon = { provider, count };
+        }
+    }
+    
+    return {
+        ...mostCommon,
+        percentage: Math.round((mostCommon.count / emails.length) * 100)
+    };
+}
+
+/**
+ * Agrupa emails por provedor para processamento otimizado
+ */
+export function groupEmailsByProvider(emails: string[]): Map<string, string[]> {
+    const groups = new Map<string, string[]>();
+    
+    emails.forEach(email => {
+        const domain = extractDomain(email);
+        const detection = detectSmtpFromEmail(email);
+        
+        const key = detection.detected && detection.provider 
+            ? `known:${detection.provider}` 
+            : `unknown:${domain}`;
+            
+        if (!groups.has(key)) {
+            groups.set(key, []);
+        }
+        groups.get(key)!.push(email);
+    });
+    
+    // Ordena por prioridade: provedores conhecidos primeiro
+    const sortedGroups = new Map<string, string[]>();
+    
+    // Primeiro os conhecidos
+    for (const [key, emails] of groups.entries()) {
+        if (key.startsWith('known:')) {
+            sortedGroups.set(key, emails);
+        }
+    }
+    
+    // Depois os desconhecidos
+    for (const [key, emails] of groups.entries()) {
+        if (key.startsWith('unknown:')) {
+            sortedGroups.set(key, emails);
+        }
+    }
+    
+    return sortedGroups;
+}
+
+/**
+ * Valida uma lista de emails de forma otimizada
+ */
+export function validateEmailsBatch(emails: string[]): {
+    valid: string[];
+    invalid: string[];
+    duplicates: string[];
+    stats: {
+        total: number;
+        validCount: number;
+        invalidCount: number;
+        duplicateCount: number;
+        uniqueDomains: number;
+        knownProviders: number;
+    };
+} {
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    const duplicates: string[] = [];
+    const seen = new Set<string>();
+    const domains = new Set<string>();
+    let knownProviders = 0;
+    
+    emails.forEach(email => {
+        const trimmed = email.trim();
+        if (!trimmed) return;
+        
+        if (!validateEmail(trimmed)) {
+            invalid.push(trimmed);
+            return;
+        }
+        
+        const normalized = trimmed.toLowerCase();
+        if (seen.has(normalized)) {
+            duplicates.push(trimmed);
+            return;
+        }
+        
+        seen.add(normalized);
+        valid.push(trimmed);
+        
+        const domain = extractDomain(trimmed);
+        if (!domains.has(domain)) {
+            domains.add(domain);
+            if (isKnownProvider(domain)) {
+                knownProviders++;
+            }
+        }
+    });
+    
+    return {
+        valid,
+        invalid,
+        duplicates,
+        stats: {
+            total: emails.length,
+            validCount: valid.length,
+            invalidCount: invalid.length,
+            duplicateCount: duplicates.length,
+            uniqueDomains: domains.size,
+            knownProviders
+        }
+    };
 }
